@@ -103,6 +103,8 @@ cargo run -p epsilon --release --example squeeze -- in.pdf out.pdf balanced
 ## Layout
 
 - [docs/HANDOVER.md](docs/HANDOVER.md) has the current state and next steps.
+  [reports/PDF size optimization techniques.md](reports/PDF%20size%20optimization%20techniques.md)
+  ranks further optimizations by savings and feasibility.
   [docs/HISTORY.md](docs/HISTORY.md) lists the versions.
 
 - [crates/epsilon/](crates/epsilon/) is the analysis and compression engine, a plain Rust library.

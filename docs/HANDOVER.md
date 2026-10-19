@@ -130,9 +130,10 @@ truncated PDF both give a clear "not a readable PDF" message.
    Push a tag such as `v0.2.0` for a draft release.
 2. **Owner decisions.** Choose a license, register the domain, and decide on code signing. Signing needs an Apple Developer
    account for macOS and a certificate for Windows.
-3. **Engine improvements,** roughly in order of payoff, now backed by analyzer findings: font subsetting and merging
-   repeated font subsets (the newspaper and handbook), CMYK and spot-colour images (the big data guide), PNG
-   predictors for lossless images, then cropping images that are mostly outside the page.
+3. **Engine improvements,** in the order recommended by `reports/PDF size optimization techniques.md` (19 October 2026):
+   CCITT G4 then lossless JBIG2 for bilevel images; lossless pixel-format reduction with PNG predictors; lossless JPEG
+   Huffman optimisation (also a safe path for CMYK JPEGs); `libdeflater` plus structural tidying; simple-font and CFF
+   subsetting; an opt-in to remove accessibility tags. Image cropping comes after these, once real files need it.
 4. **Analyzer improvements:** account for clipping paths in the visible share, rendered before-and-after comparison,
    and per-page thumbnails in the report.
 5. **App improvements:** "Open With" and Dock drops, a before-and-after page preview, and processing several files in parallel.
