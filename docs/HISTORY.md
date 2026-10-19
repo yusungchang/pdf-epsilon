@@ -28,7 +28,9 @@ reduction plus independent research.
 6. **Version rule.** The owner changed the scheme: every session raises z, a meaningful change raises y.
    This session's analyzer is meaningful, so it is 0.2.0 rather than 0.1.1.
 7. **Git and CI.** Installed the GitHub CLI and logged in as `yusungchang`, adding the `workflow` scope so the
-   pipeline can be pushed. First commit. The workflow now builds installers for all three platforms on every push
+   pipeline can be pushed. First commit. Published as the public repository `yusungchang/pdf-epsilon`.
+   Before publishing, the owner's drive paths for the test files were moved out of `HANDOVER.md` into the
+   git-ignored `scratch/test-files.md`, and commits were rewritten to use the GitHub noreply email. The workflow now builds installers for all three platforms on every push
    to `main` as downloadable artifacts, and on a `v*` tag as a draft release.
 
 ## 0.1.0, 19 October 2026

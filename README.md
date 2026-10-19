@@ -24,6 +24,7 @@ Before anything is changed, PDF Epsilon shows:
 See [docs/ANALYZER.md](docs/ANALYZER.md) for how it works.
 
 Website: <https://pdfepsilon.com> (domain not yet registered).
+Source: <https://github.com/yusungchang/pdf-epsilon>.
 
 ## What it does
 
