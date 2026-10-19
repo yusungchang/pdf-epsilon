@@ -31,7 +31,8 @@ reduction plus independent research.
    pipeline can be pushed. First commit. Published as the public repository `yusungchang/pdf-epsilon`.
    Before publishing, the owner's drive paths for the test files were moved out of `HANDOVER.md` into the
    git-ignored `scratch/test-files.md`, and commits were rewritten to use the GitHub noreply email.
-8. **New icon.** The owner supplied artwork of a crushed can marked ε (`assets/icon-art.png`). `assets/icon.svg`
+8. **New icon.** The owner supplied artwork of a crushed can (`assets/icon-art.png`), first marked ε, then
+   replaced the same session with a photoreal aluminium can marked PDF. `assets/icon.svg`
    now clips it to the macOS rounded square, all platform icons were regenerated from it, and the window
    header shows it in place of the plain ε mark.
 9. **First CI run.** Tests passed, and all four builds compiled and packaged: `.dmg` for both Macs, `.exe` and
