@@ -82,13 +82,8 @@ button { font: inherit; color: inherit; }
 
 header { padding: 20px 24px 8px; }
 .brand { display: flex; align-items: center; gap: 12px; }
-.mark {
-  width: 40px; height: 40px; border-radius: 10px;
-  background: var(--accent); color: var(--accent-ink);
-  display: grid; place-items: center;
-  font: 600 26px/1 Georgia, "Times New Roman", serif;
-  padding-bottom: 4px;
-}
+/* The app icon has a transparent margin, so it is drawn a little larger than the space it takes. */
+.mark { width: 52px; height: 52px; margin: -6px; }
 h1 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
 .tagline { margin: 0; color: var(--muted); font-size: 13px; }
 

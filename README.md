@@ -87,8 +87,10 @@ cargo run -p epsilon --release --example squeeze -- in.pdf out.pdf balanced
 - [crates/epsilon/](crates/epsilon/) is the analysis and compression engine, a plain Rust library.
 - [src-tauri/](src-tauri/) is the desktop shell. Its binary is `pdf-epsilon`.
 - [ui/](ui/) is the interface: plain HTML, CSS and JavaScript with no build step.
-- [assets/icon.svg](assets/icon.svg) is the icon source. Regenerate the platform
-  icons with `npx tauri icon assets/icon.svg -o src-tauri/icons`.
+- [assets/icon-art.png](assets/icon-art.png) is the icon artwork, a crushed can marked ε.
+  [assets/icon.svg](assets/icon.svg) clips it to the macOS rounded square. Regenerate the platform
+  icons with `npx tauri icon assets/icon.svg -o src-tauri/icons`, then delete the `android` and `ios`
+  folders it creates and copy `src-tauri/icons/128x128@2x.png` to `ui/icon.png`.
 
 ## Releases
 

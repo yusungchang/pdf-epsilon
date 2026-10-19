@@ -30,7 +30,10 @@ reduction plus independent research.
 7. **Git and CI.** Installed the GitHub CLI and logged in as `yusungchang`, adding the `workflow` scope so the
    pipeline can be pushed. First commit. Published as the public repository `yusungchang/pdf-epsilon`.
    Before publishing, the owner's drive paths for the test files were moved out of `HANDOVER.md` into the
-   git-ignored `scratch/test-files.md`, and commits were rewritten to use the GitHub noreply email. The workflow now builds installers for all three platforms on every push
+   git-ignored `scratch/test-files.md`, and commits were rewritten to use the GitHub noreply email.
+8. **New icon.** The owner supplied artwork of a crushed can marked ε (`assets/icon-art.png`). `assets/icon.svg`
+   now clips it to the macOS rounded square, all platform icons were regenerated from it, and the window
+   header shows it in place of the plain ε mark. The workflow now builds installers for all three platforms on every push
    to `main` as downloadable artifacts, and on a `v*` tag as a draft release.
 
 ## 0.1.0, 19 October 2026
