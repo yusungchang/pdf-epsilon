@@ -1,0 +1,95 @@
+name: build
+
+# Every push and pull request runs the engine tests.
+# Every push to main, and a manual run from the Actions tab, also builds installers for
+# macOS (Apple silicon and Intel), Windows and Linux. They are kept as run artifacts for 14 days.
+# A tag like v0.2.0 builds the same installers and attaches them to a draft release.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Same as .cargo/config.toml, stated here so every tool agrees on where the bundles land.
+  CARGO_TARGET_DIR: target.nosync
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target.nosync"
+      - run: cargo test -p epsilon --release
+
+  bundle:
+    if: github.event_name != 'pull_request'
+    needs: test
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-apple-silicon
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - name: macos-intel
+            os: macos-latest
+            target: x86_64-apple-darwin
+          - name: windows-x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - name: linux-x64
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+    name: bundle (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux system libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target.nosync"
+          key: ${{ matrix.target }}
+      - run: npm ci
+      # Without a tag name this only builds; with one it also uploads to the draft release.
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+          releaseName: ${{ startsWith(github.ref, 'refs/tags/v') && format('PDF Epsilon {0}', github.ref_name) || '' }}
+          releaseDraft: true
+          args: --target ${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pdf-epsilon-${{ matrix.name }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            target.nosync/${{ matrix.target }}/release/bundle/dmg/*.dmg
+            target.nosync/${{ matrix.target }}/release/bundle/nsis/*.exe
+            target.nosync/${{ matrix.target }}/release/bundle/msi/*.msi
+            target.nosync/${{ matrix.target }}/release/bundle/deb/*.deb
+            target.nosync/${{ matrix.target }}/release/bundle/rpm/*.rpm
+            target.nosync/${{ matrix.target }}/release/bundle/appimage/*.AppImage

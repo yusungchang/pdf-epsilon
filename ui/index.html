@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PDF Epsilon</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="mark" aria-hidden="true">ε</span>
+      <div>
+        <h1>PDF Epsilon</h1>
+        <p class="tagline">Make PDFs smaller. Keep what matters.</p>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <button id="drop" class="drop" type="button">
+      <span class="drop-title">Drop PDFs here to analyse them</span>
+      <span class="drop-sub">or click to choose files. Nothing is changed until you save.</span>
+    </button>
+
+    <nav id="files" class="files" aria-label="Analysed files" hidden></nav>
+
+    <p id="status" class="status" hidden></p>
+
+    <div id="report" class="report" hidden>
+      <section class="summary">
+        <div>
+          <h2 id="file-name"></h2>
+          <p id="file-facts" class="facts"></p>
+        </div>
+        <div class="file-size">
+          <div id="file-bytes" class="big"></div>
+          <div class="facts">now</div>
+        </div>
+      </section>
+
+      <div id="warnings"></div>
+
+      <section class="card">
+        <h3>Where the bytes go</h3>
+        <div id="usage-bar" class="usage-bar" role="img"></div>
+        <ul id="usage" class="usage"></ul>
+      </section>
+
+      <section class="card">
+        <h3>What each preset saves</h3>
+        <p class="hint">Measured by running each preset on this file in memory. Nothing has been written yet.</p>
+        <div id="presets" class="presets" role="radiogroup" aria-label="Preset"></div>
+        <p id="preset-note" class="note"></p>
+        <div id="breakdown" class="breakdown"></div>
+
+        <details id="advanced">
+          <summary>Advanced</summary>
+          <div class="grid">
+            <label class="row">
+              <input type="checkbox" id="images-on">
+              <span>Recompress images</span>
+            </label>
+            <label class="field">
+              <span>Highest resolution</span>
+              <span class="inline"><input type="number" id="dpi" min="36" max="1200" step="1"> dpi</span>
+            </label>
+            <label class="field">
+              <span>JPEG quality <output id="quality-out"></output></span>
+              <input type="range" id="quality" min="10" max="100" step="1">
+            </label>
+            <label class="row"><input type="checkbox" id="dedupe"><span>Merge identical images and streams</span></label>
+            <label class="row"><input type="checkbox" id="thumbs"><span>Remove page thumbnails</span></label>
+            <label class="row"><input type="checkbox" id="private"><span>Remove editor data <small>(Illustrator, Photoshop)</small></span></label>
+            <label class="row"><input type="checkbox" id="metadata"><span>Remove XMP metadata <small>(breaks PDF/A)</small></span></label>
+          </div>
+        </details>
+
+        <div class="save-row">
+          <div class="output">
+            <span>Save to</span>
+            <button id="out-same" class="link on" type="button">next to the original</button>
+            <span class="sep">or</span>
+            <button id="out-pick" class="link" type="button">choose a folder…</button>
+          </div>
+          <button id="save" class="primary" type="button">Save smaller copy</button>
+        </div>
+        <div id="save-result" class="save-result" hidden></div>
+      </section>
+
+      <section class="card">
+        <h3>What was found</h3>
+        <ul id="findings" class="findings"></ul>
+      </section>
+
+      <section class="card">
+        <div class="pages-head">
+          <h3>Page by page</h3>
+          <div class="pages-tools">
+            <label><input type="checkbox" id="only-issues"> Only pages with issues</label>
+            <label><input type="checkbox" id="largest"> Largest first</label>
+          </div>
+        </div>
+        <div class="page-legend" id="page-legend"></div>
+        <div id="pages" class="pages"></div>
+        <button id="more-pages" class="link more" type="button" hidden></button>
+      </section>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

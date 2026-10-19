@@ -1,0 +1,45 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "PDF Epsilon",
+  "mainBinaryName": "pdf-epsilon",
+  "version": "0.2.0",
+  "identifier": "com.pdfepsilon.desktop",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "PDF Epsilon",
+        "width": 820,
+        "height": 680,
+        "minWidth": 560,
+        "minHeight": 520,
+        "dragDropEnabled": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Productivity",
+    "shortDescription": "Make PDFs smaller. Keep what matters.",
+    "longDescription": "PDF Epsilon shrinks PDF files on your own computer. It downsamples and re-encodes oversized images, merges duplicates and removes clutter, while keeping text, vector drawing, links, bookmarks and forms intact.",
+    "homepage": "https://pdfepsilon.com",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "linux": {
+      "deb": { "depends": [] }
+    }
+  }
+}

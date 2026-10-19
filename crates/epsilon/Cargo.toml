@@ -1,0 +1,17 @@
+[package]
+name = "epsilon"
+description = "The PDF Epsilon compression engine: make PDFs smaller, keep what matters."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+
+[dependencies]
+lopdf = "0.45"
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
+flate2 = "1"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"

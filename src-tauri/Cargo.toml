@@ -1,0 +1,21 @@
+[package]
+name = "pdf-epsilon"
+description = "Make PDFs smaller. Keep what matters."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+
+[[bin]]
+name = "pdf-epsilon"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+epsilon = { path = "../crates/epsilon" }
+tauri = { version = "2.12", features = [] }
+tauri-plugin-dialog = "2.8"
+tauri-plugin-opener = "2.7"
+serde = { version = "1", features = ["derive"] }
