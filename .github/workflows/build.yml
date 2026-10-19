@@ -15,9 +15,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  # Same as .cargo/config.toml, stated here so every tool agrees on where the bundles land.
-  CARGO_TARGET_DIR: target.nosync
+# Build output goes to target.nosync at the repository root, set in .cargo/config.toml.
+# Don't set CARGO_TARGET_DIR to a relative path: Tauri runs cargo from src-tauri, so the
+# bundles would land in src-tauri/target.nosync and the upload step would not find them.
 
 jobs:
   test:

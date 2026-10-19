@@ -33,7 +33,10 @@ reduction plus independent research.
    git-ignored `scratch/test-files.md`, and commits were rewritten to use the GitHub noreply email.
 8. **New icon.** The owner supplied artwork of a crushed can marked ε (`assets/icon-art.png`). `assets/icon.svg`
    now clips it to the macOS rounded square, all platform icons were regenerated from it, and the window
-   header shows it in place of the plain ε mark. The workflow now builds installers for all three platforms on every push
+   header shows it in place of the plain ε mark.
+9. **First CI run.** Tests passed, and all four builds compiled and packaged: `.dmg` for both Macs, `.exe` and
+   `.msi` for Windows, `.deb`, `.rpm` and `.AppImage` for Linux. Every upload failed because a relative
+   `CARGO_TARGET_DIR` made Tauri write to `src-tauri/target.nosync`. The variable was removed. The workflow now builds installers for all three platforms on every push
    to `main` as downloadable artifacts, and on a `v*` tag as a draft release.
 
 ## 0.1.0, 19 October 2026
