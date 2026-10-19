@@ -36,7 +36,8 @@ The git repository is on branch `main` with a first commit. No GitHub remote exi
 - **Dependencies:** lopdf 0.45, image 0.25, and Tauri 2.12 with the dialog and opener plugins.
   Tauri 3 is in alpha. Stay on 2 until it is stable.
 - **Checking tools:** `mutool` (MuPDF) is installed and useful for comparisons. Ghostscript and qpdf are not installed.
-- **Missing tools:** the GitHub CLI `gh` is not installed. The owner's GitHub username was not found anywhere, so it is not in any manifest.
+- **GitHub:** the GitHub CLI `gh` is installed with Homebrew and logged in as `yusungchang`, with the `repo` and
+  `workflow` scopes. Git uses it for HTTPS. The repository `yusungchang/pdf-epsilon` does not exist yet.
 - **iCloud:** build output goes to `target.nosync`, and `node_modules` is a symlink to `node_modules.nosync`.
   iCloud does not sync folders ending in `.nosync`, and the Rust build folder reaches about 1.5 GB.
 - **Screenshots:** screen capture permission is not granted to the terminal, so the real app window cannot be screenshotted.
