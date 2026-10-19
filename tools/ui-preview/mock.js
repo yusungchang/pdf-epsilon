@@ -1,7 +1,7 @@
 // Stands in for window.__TAURI__ so the interface runs in a plain browser.
 // Analyses come from analyses.js, which preview.sh writes by running the real
 // analyzer on the PDFs it is given. Saving returns a canned result.
-const base = { dedupe: true, stripThumbnails: true, stripPrivateData: false, stripMetadata: false };
+const base = { dedupe: true, stripFontTables: true, subsetFonts: true, stripThumbnails: true, stripPrivateData: false, stripMetadata: false };
 const P = [
   { id: "lossless", options: { ...base, images: null } },
   { id: "print", options: { ...base, images: { maxDpi: 300, jpegQuality: 85 } } },

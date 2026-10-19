@@ -1,7 +1,7 @@
 {
   "name": "pdf-epsilon",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Make PDFs smaller. Keep what matters.",
   "scripts": {
     "tauri": "tauri",

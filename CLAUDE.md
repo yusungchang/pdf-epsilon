@@ -7,7 +7,9 @@ current state, verified results, design decisions and next steps. Then read `REA
 
 - `crates/epsilon` is the engine. Pipeline order is in `src/lib.rs`.
   `analyze.rs` explains a file before it is changed (see `docs/ANALYZER.md`),
-  `placement.rs` walks page content for drawn images, forms and fonts, `images.rs` recompresses,
+  `placement.rs` walks page content for drawn images, forms and fonts,
+  `subset.rs` subsets fully embedded TrueType CID fonts, `fonts.rs` drops font tables
+  no viewer reads, `images.rs` recompresses,
   `dedup.rs` merges identical streams, and `clean.rs` strips optional data.
 - `src-tauri` is the shell with commands `presets`, `file_size`, `analyze` and `compress`.
   Output files are written with `create_new` and are never overwritten.

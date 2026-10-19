@@ -45,7 +45,8 @@ to slightly less than the file. The rest is document-wide: tags, bookmarks, stru
 | Images left as is (CMYK, spot colour, JPEG 2000, ...) | not yet | Grouped by reason |
 | Images mostly outside the page | not yet | Under 70% visible. Clipping paths are not counted yet |
 | Images not drawn on any page | kept | For example in annotations or patterns |
-| Fonts embedded in full | not yet | No subset tag, program of 20 KB or more |
+| Fonts embedded in full | fixed / not yet | No subset tag, program of 20 KB or more. Fixed for TrueType CID fonts |
+| Fonts carrying data no viewer reads | fixed | Bitmaps, layout tables; measured per preset |
 | Typeface embedded more than once | not yet | Counted per distinct font program |
 | Duplicate streams | fixed | |
 | Thumbnails, editor data, XMP, unused objects | fixed | |

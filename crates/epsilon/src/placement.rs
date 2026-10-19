@@ -108,7 +108,7 @@ pub fn visit_page(doc: &Document, page_id: ObjectId, visit: &mut dyn FnMut(Draw)
 }
 
 /// The page's resource dictionaries, nearest first (inherited ones follow).
-fn page_resources(doc: &Document, page_id: ObjectId) -> Vec<Dictionary> {
+pub(crate) fn page_resources(doc: &Document, page_id: ObjectId) -> Vec<Dictionary> {
     let mut out = Vec::new();
     if let Ok((own, inherited)) = doc.get_page_resources(page_id) {
         if let Some(d) = own {
@@ -123,14 +123,14 @@ fn page_resources(doc: &Document, page_id: ObjectId) -> Vec<Dictionary> {
     out
 }
 
-fn deref<'a>(doc: &'a Document, obj: &'a Object) -> &'a Object {
+pub(crate) fn deref<'a>(doc: &'a Document, obj: &'a Object) -> &'a Object {
     match obj {
         Object::Reference(id) => doc.get_object(*id).unwrap_or(obj),
         _ => obj,
     }
 }
 
-fn lookup(doc: &Document, resources: &[Dictionary], kind: &[u8], name: &[u8]) -> Option<ObjectId> {
+pub(crate) fn lookup(doc: &Document, resources: &[Dictionary], kind: &[u8], name: &[u8]) -> Option<ObjectId> {
     for res in resources {
         let Ok(entries) = res.get(kind) else { continue };
         let Ok(entries) = deref(doc, entries).as_dict() else { continue };

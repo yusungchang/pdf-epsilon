@@ -49,9 +49,12 @@ Source: <https://github.com/yusungchang/pdf-epsilon>.
    size it is actually drawn on the page, not guessed from the page size.
 2. **Re-encodes photographs as JPEG** at the chosen quality. Flat graphics such as
    screenshots, charts and transparency masks stay lossless.
-3. **Merges identical streams.** A logo repeated on every page is stored once.
-4. **Removes clutter:** page thumbnails, and optionally editor private data and XMP metadata.
-5. **Repacks the file:** drops unused objects, deflates streams and packs objects
+3. **Slims embedded fonts.** Fonts embedded in full keep only the glyphs the pages draw,
+   and every font loses data no PDF viewer reads, such as screen bitmaps. Text looks the
+   same and stays searchable. A 15 MB test file with a whole CJK font became 80 KB.
+4. **Merges identical streams.** A logo repeated on every page is stored once.
+5. **Removes clutter:** page thumbnails, and optionally editor private data and XMP metadata.
+6. **Repacks the file:** drops unused objects, deflates streams and packs objects
    into compressed object streams.
 
 Text, fonts, vector drawing, links, bookmarks, forms, annotations and attachments are
@@ -72,8 +75,9 @@ Every setting can be changed under **Advanced**.
 ## Not yet supported
 
 - **Encrypted PDFs** are refused, including ones with only an owner password.
-- **Fonts are not subsetted.** Files dominated by embedded fonts, common with CJK text,
-  shrink very little.
+- **Only some fonts are subset:** Type 0 TrueType fonts with Identity encoding, which is how
+  Word, browsers and most CJK documents embed them. Fonts that form fields can type with are
+  left whole. Simple TrueType, Type 1 and CFF fonts are not subset yet.
 - **Some images are left as they are:** CMYK, indexed, spot colour, 1-bit and 16-bit
   images, JPEG 2000, JBIG2 and CCITT.
 

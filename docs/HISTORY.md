@@ -6,6 +6,33 @@
 |---|---|---|
 | 0.1.0 | 2026-10-19 | First version: engine, Tauri shell, interface, icon, CI workflow, docs. |
 | 0.2.0 | 2026-10-19 | Analyzer: byte breakdown, measured preset savings, findings and page-by-page report. Installers for all platforms. English and Korean. |
+| 0.3.0 | 2026-10-19 | Font optimizer: unused font tables dropped, fully embedded TrueType CID fonts subset. Research on further optimizations. |
+
+## 0.3.0, 19 October 2026
+
+The owner asked for font work first, and for deep research on other optimizations.
+
+1. **Finding.** The Korean newspaper test file was 90% fonts, and its fonts were already subsets. Extracting them
+   showed two 4 MB fonts made almost entirely of `bdat`/`bloc` screen bitmaps, which PDF viewers never read.
+   Rebuilding them with only the tables viewers use measured 2.8 MB of compressed font data dropping to 41 KB.
+2. **Font tables (`fonts.rs`).** Every embedded TrueType or OpenType font keeps only an allow list of tables: the
+   ones ISO 32000 requires, plus cmap, OS/2, name, post, vertical metrics and colour glyphs. Bitmap-only fonts,
+   collections and anything malformed are left alone. The newspaper went from 3.4 MB to 313 KB, losslessly.
+3. **Subsetting (`subset.rs`).** Type 0 fonts with Identity-H/V encoding over an embedded TrueType CIDFont are
+   subset to the glyphs drawn, keeping glyph numbers, so no text, width or ToUnicode changes. Text is collected
+   from page content, form XObjects, patterns, soft masks, annotation appearances and Type 3 glyphs. Fonts in the
+   form's default resources or set through a graphics state stay whole, and nothing is subset if any content
+   fails to decode. Subset fonts get a six-letter tag. Two test PDFs built with whole macOS fonts went from
+   15.2 MB to 80 KB and from 6.1 MB to 115 KB.
+4. **Checks.** On all eight test files and the two big-font files, extracted text is identical and every page
+   renders pixel-identical in MuPDF. macOS's renderer was also identical, apart from 4 pixels on the newspaper
+   that differ by at most 2 levels.
+5. **Analyzer.** New finding for font data no viewer reads. Fonts embedded in full are now "fixed" with measured
+   savings, and repeated subsets are sized after stripping, so the newspaper no longer blames 1.5 MB on them.
+6. **Options.** `stripFontTables` and `subsetFonts`, on in every preset, with checkboxes under Advanced.
+   Settings saved earlier turn them on.
+7. **Research.** Four research passes on images, fonts, structure and existing tools; the report is
+   `reports/PDF size optimization techniques.md`.
 
 ## 0.2.0, 19 October 2026
 

@@ -1,7 +1,7 @@
 # Handover
 
 Where PDF Epsilon stands, what has been verified, and what to do next.
-Last updated 19 October 2026, at version 0.2.0.
+Last updated 19 October 2026, at version 0.3.0.
 
 ## The brief
 
@@ -27,6 +27,7 @@ The code is public at https://github.com/yusungchang/pdf-epsilon, branch `main`.
 | Analyzer (`analyze.rs`) | Done. Checked on the eight test files; categories add up to the exact size. |
 | Desktop shell (`src-tauri`) | Done. Release build verified on macOS, Apple silicon. |
 | Interface (`ui`) | Done. Checked in headless Chrome with a mocked bridge serving real analyses. Not yet clicked through in the real app window. |
+| Font optimizer (`fonts.rs`, `subset.rs`) | Done for TrueType CID fonts. Checked by text and pixel comparison in MuPDF and macOS. |
 | Languages (`ui/locales`) | English and Korean. Every string is in the locale files; tests check they match. |
 | CI and releases (`.github/workflows/build.yml`) | Builds installers for all three platforms on every push to `main` and on `v*` tags. First run started on 19 October 2026. |
 | Windows and Linux | Configured, never built or run. |
@@ -110,7 +111,8 @@ truncated PDF both give a clear "not a readable PDF" message.
 
 ## Known issues and gaps
 
-- **Fonts are not subsetted.** This is the biggest remaining lever for text-heavy and CJK documents.
+- **Only Type 0 TrueType fonts with Identity encoding are subset.** Simple TrueType fonts (cmap lookup rules),
+  Type 1 and CFF are not yet.
 - **CMYK and spot-colour images are untouched.** CMYK JPEGs with Adobe inversion need careful handling.
 - **Lossless images use no PNG predictors.** Adding them would make re-deflated graphics noticeably smaller.
 - **Encrypted PDFs cannot be processed.** A password prompt could open and re-encrypt them, but would need care with permissions.

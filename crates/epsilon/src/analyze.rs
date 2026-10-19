@@ -126,6 +126,7 @@ pub struct PresetResult {
 #[serde(rename_all = "camelCase")]
 pub enum SavingKind {
     Images,
+    Fonts,
     Duplicates,
     Thumbnails,
     EditorData,
@@ -961,6 +962,10 @@ impl Inspected {
             };
             let mut by_kind: Vec<(SavingKind, i64)> = vec![
                 (SavingKind::Images, image_saving.values().sum()),
+                (
+                    SavingKind::Fonts,
+                    run.fonts.iter().chain(&run.subsets).map(|c| c.before as i64 - c.after as i64).sum(),
+                ),
                 (SavingKind::Duplicates, run.merged.iter().map(removed_span).sum()),
             ];
             for (kind, cat) in [
@@ -1155,24 +1160,60 @@ impl Inspected {
             );
         }
 
+        // Font savings measured per run, for the font findings.
+        let per_run = |pick: fn(&Run) -> &Vec<crate::fonts::Change>| -> Vec<u64> {
+            runs.iter()
+                .map(|r| r.as_ref().ok().filter(|r| !r.report.kept_original))
+                .map(|r| r.map(|r| pick(r).iter().map(|c| c.before.saturating_sub(c.after) as u64).sum()).unwrap_or(0))
+                .collect()
+        };
         // Fonts.
         let full: Vec<&FontInfo> = self.fonts.iter().filter(|f| f.embedded && !f.subset && f.program_bytes >= 20_000).collect();
         if !full.is_empty() {
             let b = full.iter().map(|f| f.program_bytes).sum();
+            let subset_programs: HashSet<u32> = runs
+                .first()
+                .and_then(|r| r.as_ref().ok())
+                .map(|r| r.subsets.iter().map(|c| c.id.0).collect())
+                .unwrap_or_default();
+            let done = full.iter().filter(|f| f.program_obj.map(|o| subset_programs.contains(&o)).unwrap_or(false)).count();
             let names: Vec<String> = full.iter().take(4).map(|f| f.name.clone()).collect();
             let names = if full.len() > 4 {
                 msg!("finding.fullFonts.namesAndMore", names = names, count = full.len() - 4)
             } else {
                 msg!("finding.fullFonts.names", names = names)
             };
+            let mut detail = vec![names];
+            if done > 0 {
+                detail.push(msg!("finding.fullFonts.detail"));
+                if done < full.len() {
+                    detail.push(msg!("finding.fullFonts.notAll", count = full.len() - done));
+                }
+            } else {
+                detail.push(msg!("finding.fullFonts.detailNotYet"));
+            }
             push(
                 "fullFonts",
-                Status::NotYet,
+                if done > 0 { Status::Fixed } else { Status::NotYet },
                 msg!("finding.fullFonts.title", count = full.len()),
-                vec![names, msg!("finding.fullFonts.detail")],
+                detail,
                 b,
-                none(),
+                if done > 0 { per_run(|r| &r.subsets) } else { none() },
                 full.iter().flat_map(|f| f.pages.first().copied()).collect::<BTreeSet<_>>().into_iter().collect(),
+            );
+        }
+        // Font data no viewer reads, measured from the runs.
+        let slimmed = per_run(|r| &r.fonts);
+        let slimmed_count = runs.first().and_then(|r| r.as_ref().ok()).map(|r| r.fonts.len()).unwrap_or(0);
+        if slimmed.iter().any(|b| *b > 0) {
+            push(
+                "fontTables",
+                Status::Fixed,
+                msg!("finding.fontTables.title", count = slimmed_count),
+                vec![msg!("finding.fontTables.detail")],
+                *slimmed.iter().max().unwrap(),
+                slimmed,
+                Vec::new(),
             );
         }
         // Counted by distinct program: some producers point many font dictionaries at one.
@@ -1184,9 +1225,16 @@ impl Inspected {
             }
         }
         let repeated: Vec<(&str, Vec<&FontInfo>)> = families.into_iter().filter(|(_, v)| v.len() > 1).collect();
+        // Sized as they are once unread tables are dropped, so the two findings do not count the same bytes.
+        let slim: HashMap<u32, u64> = runs
+            .first()
+            .and_then(|r| r.as_ref().ok())
+            .map(|r| r.fonts.iter().map(|c| (c.id.0, c.after as u64)).collect())
+            .unwrap_or_default();
+        let size = |f: &FontInfo| f.program_obj.and_then(|o| slim.get(&o).copied()).unwrap_or(f.program_bytes);
         let repeated_bytes: u64 = repeated
             .iter()
-            .map(|(_, v)| v.iter().map(|f| f.program_bytes).sum::<u64>() - v.iter().map(|f| f.program_bytes).max().unwrap_or(0))
+            .map(|(_, v)| v.iter().map(|f| size(f)).sum::<u64>() - v.iter().map(|f| size(f)).max().unwrap_or(0))
             .sum();
         if repeated_bytes >= 20_000 {
             let copies: usize = repeated.iter().map(|(_, v)| v.len()).sum();
@@ -1565,7 +1613,7 @@ fn dict_len(d: &Dictionary) -> usize {
 
 // ---- the object graph ----
 
-fn children(o: &Object, out: &mut Vec<ObjectId>) {
+pub(crate) fn children(o: &Object, out: &mut Vec<ObjectId>) {
     match o {
         Object::Reference(id) => out.push(*id),
         Object::Array(a) => a.iter().for_each(|x| children(x, out)),
@@ -1575,7 +1623,7 @@ fn children(o: &Object, out: &mut Vec<ObjectId>) {
     }
 }
 
-fn reachable(doc: &Document) -> HashSet<ObjectId> {
+pub(crate) fn reachable(doc: &Document) -> HashSet<ObjectId> {
     let mut seen = HashSet::new();
     let mut queue = Vec::new();
     for (key, v) in doc.trailer.iter() {

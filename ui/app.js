@@ -155,6 +155,8 @@ function renderSettings() {
   $("quality-out").textContent = img.jpegQuality;
   for (const id of ["dpi", "quality"]) $(id).closest("label").classList.toggle("disabled", !o.images);
   $("dedupe").checked = o.dedupe;
+  $("font-tables").checked = o.stripFontTables !== false;
+  $("subset-fonts").checked = o.subsetFonts !== false;
   $("thumbs").checked = o.stripThumbnails;
   $("private").checked = o.stripPrivateData;
   $("metadata").checked = o.stripMetadata;
@@ -170,6 +172,8 @@ function readAdvanced() {
   state.options = {
     images: $("images-on").checked ? { maxDpi: dpi, jpegQuality: Number($("quality").value) } : null,
     dedupe: $("dedupe").checked,
+    stripFontTables: $("font-tables").checked,
+    subsetFonts: $("subset-fonts").checked,
     stripThumbnails: $("thumbs").checked,
     stripPrivateData: $("private").checked,
     stripMetadata: $("metadata").checked,
@@ -633,7 +637,7 @@ async function init() {
   }
   renderSettings();
 
-  for (const id of ["images-on", "dpi", "quality", "dedupe", "thumbs", "private", "metadata"]) {
+  for (const id of ["images-on", "dpi", "quality", "dedupe", "subset-fonts", "font-tables", "thumbs", "private", "metadata"]) {
     $(id).addEventListener("input", readAdvanced);
   }
   $("out-same").addEventListener("click", () => { state.outputDir = null; renderSettings(); persist(); });

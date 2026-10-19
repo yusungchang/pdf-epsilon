@@ -5,9 +5,11 @@
 //!    Resolution is measured from where each image is actually drawn on the page.
 //! 2. Photographic images are re-encoded as JPEG at the chosen quality.
 //!    Flat graphics (screenshots, diagrams, masks) stay lossless.
-//! 3. Byte-identical streams are merged, so a logo repeated on every page is stored once.
-//! 4. Optional clutter is removed: page thumbnails, editor private data, XMP metadata.
-//! 5. Unreferenced objects are dropped, streams are deflated, and objects are packed
+//! 3. Fully embedded TrueType CID fonts are subset to the glyphs drawn, and embedded fonts
+//!    lose tables no viewer reads, such as screen bitmaps. Outlines in use stay exactly.
+//! 4. Byte-identical streams are merged, so a logo repeated on every page is stored once.
+//! 5. Optional clutter is removed: page thumbnails, editor private data, XMP metadata.
+//! 6. Unreferenced objects are dropped, streams are deflated, and objects are packed
 //!    into compressed object streams.
 //!
 //! What it keeps: text, fonts, vector drawing, links, bookmarks, forms, annotations,
@@ -21,8 +23,10 @@ mod analyze;
 mod clean;
 mod message;
 mod dedup;
+mod fonts;
 mod images;
 mod placement;
+mod subset;
 
 use std::path::Path;
 
@@ -77,6 +81,14 @@ pub struct Options {
     pub images: Option<ImagePolicy>,
     /// Merge byte-identical streams.
     pub dedupe: bool,
+    /// Drop font tables no PDF viewer reads, such as embedded screen bitmaps. Lossless.
+    /// Settings saved before this option existed turn it on.
+    #[serde(default = "yes")]
+    pub strip_font_tables: bool,
+    /// Keep only the glyphs the document draws in fonts embedded in full. The pages look the
+    /// same and text stays searchable, but the fonts can no longer type new text.
+    #[serde(default = "yes")]
+    pub subset_fonts: bool,
     /// Remove embedded page thumbnails. Viewers draw their own.
     pub strip_thumbnails: bool,
     /// Remove `/PieceInfo` editor data (Illustrator, Photoshop). The PDF still
@@ -87,11 +99,17 @@ pub struct Options {
     pub strip_metadata: bool,
 }
 
+fn yes() -> bool {
+    true
+}
+
 impl Options {
     fn base() -> Self {
         Options {
             images: None,
             dedupe: true,
+            strip_font_tables: true,
+            subset_fonts: true,
             strip_thumbnails: true,
             strip_private_data: false,
             strip_metadata: false,
@@ -114,6 +132,8 @@ pub struct Report {
     pub images_seen: u32,
     pub images_downsampled: u32,
     pub images_reencoded: u32,
+    pub fonts_subset: u32,
+    pub fonts_slimmed: u32,
     pub duplicates_merged: u32,
     pub objects_removed: u32,
     /// True when the optimised file was not smaller and the original bytes were kept.
@@ -195,6 +215,8 @@ struct Run {
     bytes: Vec<u8>,
     report: Report,
     images: Vec<images::Change>,
+    fonts: Vec<fonts::Change>,
+    subsets: Vec<fonts::Change>,
     /// Ids of the original objects that are gone: merged duplicates and pruned objects.
     merged: Vec<ObjectId>,
     pruned: Vec<ObjectId>,
@@ -221,6 +243,11 @@ fn optimize(input: &[u8], mut doc: Document, options: &Options) -> Result<Run> {
         report.images_seen = images::count(&doc);
     }
 
+    let subsets = if options.subset_fonts { subset::subset_fonts(&mut doc) } else { Vec::new() };
+    report.fonts_subset = subsets.len() as u32;
+    let slimmed = if options.strip_font_tables { fonts::strip_tables(&mut doc) } else { Vec::new() };
+    report.fonts_slimmed = slimmed.len() as u32;
+
     let merged = if options.dedupe { dedup::merge_identical_streams(&mut doc) } else { Vec::new() };
     report.duplicates_merged = merged.len() as u32;
 
@@ -241,10 +268,10 @@ fn optimize(input: &[u8], mut doc: Document, options: &Options) -> Result<Run> {
     if out.len() >= input.len() {
         report.output_bytes = input.len() as u64;
         report.kept_original = true;
-        return Ok(Run { bytes: input.to_vec(), report, images: changed, merged, pruned });
+        return Ok(Run { bytes: input.to_vec(), report, images: changed, fonts: slimmed, subsets, merged, pruned });
     }
     report.output_bytes = out.len() as u64;
-    Ok(Run { bytes: out, report, images: changed, merged, pruned })
+    Ok(Run { bytes: out, report, images: changed, fonts: slimmed, subsets, merged, pruned })
 }
 
 /// True when the file has an `/Encrypt` key followed by a delimiter, so `/EncryptMetadata`
