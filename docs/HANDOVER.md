@@ -27,6 +27,7 @@ The code is public at https://github.com/yusungchang/pdf-epsilon, branch `main`.
 | Analyzer (`analyze.rs`) | Done. Checked on the eight test files; categories add up to the exact size. |
 | Desktop shell (`src-tauri`) | Done. Release build verified on macOS, Apple silicon. |
 | Interface (`ui`) | Done. Checked in headless Chrome with a mocked bridge serving real analyses. Not yet clicked through in the real app window. |
+| Languages (`ui/locales`) | English and Korean. Every string is in the locale files; tests check they match. |
 | CI and releases (`.github/workflows/build.yml`) | Builds installers for all three platforms on every push to `main` and on `v*` tags. First run started on 19 October 2026. |
 | Windows and Linux | Configured, never built or run. |
 
@@ -142,6 +143,6 @@ cargo run -p epsilon --release --example inspect -- in.pdf --pages              
 cargo run -p epsilon --release --example squeeze -- in.pdf out.pdf balanced
 mutool draw -q -F txt in.pdf | md5; mutool draw -q -F txt out.pdf | md5   # must match
 mutool draw -q -r 110 -o page.png out.pdf 1                                 # then look at it
-tools/ui-preview/preview.sh /tmp/ui.png dark 2600 a.pdf b.pdf               # interface with real analyses
+PREVIEW_LANG=ko tools/ui-preview/preview.sh /tmp/ui.png dark 2600 a.pdf b.pdf  # interface with real analyses
 npm run build                                                               # must finish
 ```

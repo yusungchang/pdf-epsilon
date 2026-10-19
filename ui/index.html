@@ -7,23 +7,29 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Text comes from locales/<language>.json: data-i18n sets an element's text,
+       data-i18n-label its aria-label. Product names are not translated. -->
   <header>
     <div class="brand">
       <img class="mark" src="icon.png" alt="" width="52" height="52">
       <div>
         <h1>PDF Epsilon</h1>
-        <p class="tagline">Make PDFs smaller. Keep what matters.</p>
+        <p class="tagline" data-i18n="app.tagline"></p>
       </div>
     </div>
+    <label class="language">
+      <span class="visually-hidden" data-i18n="language.label"></span>
+      <select id="language"></select>
+    </label>
   </header>
 
   <main>
     <button id="drop" class="drop" type="button">
-      <span class="drop-title">Drop PDFs here to analyse them</span>
-      <span class="drop-sub">or click to choose files. Nothing is changed until you save.</span>
+      <span class="drop-title" data-i18n="drop.title"></span>
+      <span class="drop-sub" data-i18n="drop.sub"></span>
     </button>
 
-    <nav id="files" class="files" aria-label="Analysed files" hidden></nav>
+    <nav id="files" class="files" data-i18n-label="files.label" hidden></nav>
 
     <p id="status" class="status" hidden></p>
 
@@ -35,70 +41,70 @@
         </div>
         <div class="file-size">
           <div id="file-bytes" class="big"></div>
-          <div class="facts">now</div>
+          <div class="facts" data-i18n="summary.now"></div>
         </div>
       </section>
 
       <div id="warnings"></div>
 
       <section class="card">
-        <h3>Where the bytes go</h3>
+        <h3 data-i18n="usage.title"></h3>
         <div id="usage-bar" class="usage-bar" role="img"></div>
         <ul id="usage" class="usage"></ul>
       </section>
 
       <section class="card">
-        <h3>What each preset saves</h3>
-        <p class="hint">Measured by running each preset on this file in memory. Nothing has been written yet.</p>
-        <div id="presets" class="presets" role="radiogroup" aria-label="Preset"></div>
+        <h3 data-i18n="presets.title"></h3>
+        <p class="hint" data-i18n="presets.hint"></p>
+        <div id="presets" class="presets" role="radiogroup" data-i18n-label="presets.label"></div>
         <p id="preset-note" class="note"></p>
         <div id="breakdown" class="breakdown"></div>
 
         <details id="advanced">
-          <summary>Advanced</summary>
+          <summary data-i18n="advanced.title"></summary>
           <div class="grid">
             <label class="row">
               <input type="checkbox" id="images-on">
-              <span>Recompress images</span>
+              <span data-i18n="advanced.images"></span>
             </label>
             <label class="field">
-              <span>Highest resolution</span>
-              <span class="inline"><input type="number" id="dpi" min="36" max="1200" step="1"> dpi</span>
+              <span data-i18n="advanced.resolution"></span>
+              <span class="inline"><input type="number" id="dpi" min="36" max="1200" step="1"> <span data-i18n="advanced.dpi"></span></span>
             </label>
             <label class="field">
-              <span>JPEG quality <output id="quality-out"></output></span>
+              <span><span data-i18n="advanced.quality"></span> <output id="quality-out"></output></span>
               <input type="range" id="quality" min="10" max="100" step="1">
             </label>
-            <label class="row"><input type="checkbox" id="dedupe"><span>Merge identical images and streams</span></label>
-            <label class="row"><input type="checkbox" id="thumbs"><span>Remove page thumbnails</span></label>
-            <label class="row"><input type="checkbox" id="private"><span>Remove editor data <small>(Illustrator, Photoshop)</small></span></label>
-            <label class="row"><input type="checkbox" id="metadata"><span>Remove XMP metadata <small>(breaks PDF/A)</small></span></label>
+            <label class="row"><input type="checkbox" id="dedupe"><span data-i18n="advanced.dedupe"></span></label>
+            <label class="row"><input type="checkbox" id="thumbs"><span data-i18n="advanced.thumbnails"></span></label>
+            <label class="row"><input type="checkbox" id="private"><span><span data-i18n="advanced.editorData"></span> <small data-i18n="advanced.editorDataNote"></small></span></label>
+            <label class="row"><input type="checkbox" id="metadata"><span><span data-i18n="advanced.metadata"></span> <small data-i18n="advanced.metadataNote"></small></span></label>
           </div>
         </details>
 
         <div class="save-row">
           <div class="output">
-            <span>Save to</span>
-            <button id="out-same" class="link on" type="button">next to the original</button>
-            <span class="sep">or</span>
-            <button id="out-pick" class="link" type="button">choose a folder…</button>
+            <span data-i18n="save.to"></span>
+            <button id="out-same" class="link on" type="button" data-i18n="save.nextTo"></button>
+            <span class="sep" data-i18n="save.or"></span>
+            <button id="out-pick" class="link" type="button"></button>
           </div>
-          <button id="save" class="primary" type="button">Save smaller copy</button>
+          <button id="save" class="primary" type="button" data-i18n="save.button"></button>
         </div>
         <div id="save-result" class="save-result" hidden></div>
       </section>
 
       <section class="card">
-        <h3>What was found</h3>
+        <h3 data-i18n="found.title"></h3>
         <ul id="findings" class="findings"></ul>
       </section>
 
       <section class="card">
         <div class="pages-head">
-          <h3>Page by page</h3>
+          <h3 data-i18n="pages.title"></h3>
           <div class="pages-tools">
-            <label><input type="checkbox" id="only-issues"> Only pages with issues</label>
-            <label><input type="checkbox" id="largest"> Largest first</label>
+            <label><input type="checkbox" id="only-issues"> <span data-i18n="pages.onlyIssues"></span></label>
+            <label><input type="checkbox" id="largest"> <span data-i18n="pages.largest"></span></label>
           </div>
         </div>
         <div class="page-legend" id="page-legend"></div>

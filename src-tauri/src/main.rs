@@ -25,6 +25,30 @@ struct Outcome {
     report: Report,
 }
 
+/// An error for the interface: a code it translates (`error.<code>` in ui/locales),
+/// plus untranslated technical detail.
+#[derive(Serialize)]
+struct Failure {
+    code: &'static str,
+    detail: String,
+}
+
+impl From<epsilon::Error> for Failure {
+    fn from(e: epsilon::Error) -> Self {
+        Failure { code: e.code(), detail: e.detail() }
+    }
+}
+
+impl From<std::io::Error> for Failure {
+    fn from(e: std::io::Error) -> Self {
+        Failure { code: "io", detail: e.to_string() }
+    }
+}
+
+fn internal(e: impl std::fmt::Display) -> Failure {
+    Failure { code: "internal", detail: e.to_string() }
+}
+
 #[derive(Serialize)]
 struct PresetInfo {
     id: Preset,
@@ -41,28 +65,26 @@ fn presets() -> Vec<PresetInfo> {
 }
 
 #[tauri::command]
-fn file_size(path: PathBuf) -> Result<u64, String> {
-    std::fs::metadata(&path).map(|m| m.len()).map_err(|e| e.to_string())
+fn file_size(path: PathBuf) -> Result<u64, Failure> {
+    Ok(std::fs::metadata(&path)?.len())
 }
 
 /// Explains where a file's bytes go and what each preset saves. Writes nothing.
 #[tauri::command]
-async fn analyze(path: PathBuf) -> Result<epsilon::Analysis, String> {
-    tauri::async_runtime::spawn_blocking(move || epsilon::analyze_file(&path).map_err(|e| e.to_string()))
+async fn analyze(path: PathBuf) -> Result<epsilon::Analysis, Failure> {
+    tauri::async_runtime::spawn_blocking(move || epsilon::analyze_file(&path).map_err(Failure::from))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(internal)?
 }
 
 #[tauri::command]
-async fn compress(job: Job) -> Result<Outcome, String> {
-    tauri::async_runtime::spawn_blocking(move || run(job))
-        .await
-        .map_err(|e| e.to_string())?
+async fn compress(job: Job) -> Result<Outcome, Failure> {
+    tauri::async_runtime::spawn_blocking(move || run(job)).await.map_err(internal)?
 }
 
-fn run(job: Job) -> Result<Outcome, String> {
-    let bytes = std::fs::read(&job.input).map_err(|e| e.to_string())?;
-    let (out, report) = epsilon::compress_bytes(&bytes, &job.options).map_err(|e| e.to_string())?;
+fn run(job: Job) -> Result<Outcome, Failure> {
+    let bytes = std::fs::read(&job.input)?;
+    let (out, report) = epsilon::compress_bytes(&bytes, &job.options)?;
     if report.kept_original {
         return Ok(Outcome { output: None, report });
     }
@@ -71,7 +93,7 @@ fn run(job: Job) -> Result<Outcome, String> {
         None => job.input.parent().map(Path::to_path_buf).unwrap_or_default(),
     };
     let stem = job.input.file_stem().and_then(|s| s.to_str()).unwrap_or("document");
-    let path = write_new(&dir, stem, &out).map_err(|e| e.to_string())?;
+    let path = write_new(&dir, stem, &out)?;
     Ok(Outcome { output: Some(path), report })
 }
 

@@ -19,6 +19,7 @@
 
 mod analyze;
 mod clean;
+mod message;
 mod dedup;
 mod images;
 mod placement;
@@ -29,6 +30,7 @@ use lopdf::{Document, ObjectId};
 use serde::{Deserialize, Serialize};
 
 pub use analyze::*;
+pub use message::{Arg, Message};
 pub use images::ImagePolicy;
 
 /// Ready-made settings, from untouched pixels to smallest file.
@@ -128,6 +130,28 @@ pub enum Error {
     Encrypted,
     #[error("the optimised file failed verification ({0}); the original was not changed")]
     Verify(String),
+}
+
+impl Error {
+    /// A stable code for the interface, which shows its own translated text for it.
+    /// See `error.*` in `ui/locales`.
+    pub fn code(&self) -> &'static str {
+        match self {
+            Error::Io(_) => "io",
+            Error::Parse(_) => "parse",
+            Error::Encrypted => "encrypted",
+            Error::Verify(_) => "verify",
+        }
+    }
+
+    /// The technical detail behind the code, untranslated. Empty when there is none.
+    pub fn detail(&self) -> String {
+        match self {
+            Error::Io(e) => e.to_string(),
+            Error::Parse(d) | Error::Verify(d) => d.clone(),
+            Error::Encrypted => String::new(),
+        }
+    }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

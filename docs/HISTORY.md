@@ -5,7 +5,7 @@
 | Version | Date | Change |
 |---|---|---|
 | 0.1.0 | 2026-10-19 | First version: engine, Tauri shell, interface, icon, CI workflow, docs. |
-| 0.2.0 | 2026-10-19 | Analyzer: byte breakdown, measured preset savings, findings and page-by-page report. |
+| 0.2.0 | 2026-10-19 | Analyzer: byte breakdown, measured preset savings, findings and page-by-page report. Installers for all platforms. English and Korean. |
 
 ## 0.2.0, 19 October 2026
 
@@ -37,7 +37,12 @@ reduction plus independent research.
    header shows it in place of the plain ε mark.
 9. **First CI run.** Tests passed, and all four builds compiled and packaged: `.dmg` for both Macs, `.exe` and
    `.msi` for Windows, `.deb`, `.rpm` and `.AppImage` for Linux. Every upload failed because a relative
-   `CARGO_TARGET_DIR` made Tauri write to `src-tauri/target.nosync`. The variable was removed. The workflow now builds installers for all three platforms on every push
+   `CARGO_TARGET_DIR` made Tauri write to `src-tauri/target.nosync`. The variable was removed.
+10. **Languages.** All text moved into `ui/locales/en.json`, with a Korean `ko.json`. The engine now returns
+    message keys with typed values (counts, sizes, lists, terms) instead of English sentences, and error
+    codes instead of error text, so the interface formats numbers, sizes, lists and plurals per language.
+    The `inspect` example reads `en.json` too. A language picker sits in the header; the first choice
+    follows the system language. `tests/locales.rs` checks keys and placeholders across languages. The workflow now builds installers for all three platforms on every push
    to `main` as downloadable artifacts, and on a `v*` tag as a draft release.
 
 ## 0.1.0, 19 October 2026

@@ -2,10 +2,56 @@
 //!
 //! Prints what the analyzer found: where the bytes go, what each preset saves,
 //! findings, and with `--pages` the issues on every page. `--json` prints the raw analysis.
+//! Finding and issue texts come from the interface's English file, ui/locales/en.json.
 
 use std::path::Path;
 
-use epsilon::{analyze_file, Preset, Status};
+use epsilon::{analyze_file, Arg, Message, Preset, Status};
+use serde_json::Value;
+
+/// Renders engine messages with English plural rules: "one" for a count of 1, else "other".
+struct Text(serde_json::Map<String, Value>);
+
+impl Text {
+    fn load() -> Self {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../ui/locales/en.json");
+        let json = std::fs::read_to_string(path).expect("ui/locales/en.json");
+        match serde_json::from_str(&json).expect("en.json is valid JSON") {
+            Value::Object(map) => Text(map),
+            _ => panic!("en.json must be an object"),
+        }
+    }
+
+    fn key(&self, key: &str, count: Option<f64>) -> String {
+        match self.0.get(key) {
+            Some(Value::String(s)) => s.clone(),
+            Some(Value::Object(forms)) => {
+                let form = if count == Some(1.0) { "one" } else { "other" };
+                forms.get(form).or_else(|| forms.get("other")).and_then(Value::as_str).unwrap_or(key).to_string()
+            }
+            _ => key.rsplit('.').next().unwrap_or(key).to_string(),
+        }
+    }
+
+    fn say(&self, m: &Message) -> String {
+        let count = match m.args.get("count") {
+            Some(Arg::Number(n)) => Some(*n),
+            _ => None,
+        };
+        let mut out = self.key(m.key, count);
+        for (name, arg) in &m.args {
+            let value = match arg {
+                Arg::Number(n) => format!("{n}"),
+                Arg::Text(t) => t.clone(),
+                Arg::List(items) => items.join(", "),
+                Arg::Bytes { bytes } => size(*bytes),
+                Arg::Term { term } => self.key(term, None),
+            };
+            out = out.replace(&format!("{{{name}}}"), &value);
+        }
+        out
+    }
+}
 
 fn size(n: u64) -> String {
     match n {
@@ -32,6 +78,7 @@ fn main() {
         println!("{}", serde_json::to_string_pretty(&a).unwrap());
         return;
     }
+    let text = Text::load();
     let f = &a.file;
     println!("{path}");
     println!(
@@ -78,8 +125,9 @@ fn main() {
             Status::Kept => "kept".into(),
             Status::Warning => "warning".into(),
         };
-        println!("  [{:?}] {} — {} ({status})", x.severity, x.title, size(x.bytes));
-        println!("      {}", x.detail);
+        println!("  [{:?}] {} — {} ({status})", x.severity, text.say(&x.title), size(x.bytes));
+        let detail: Vec<String> = x.detail.iter().map(|m| text.say(m)).collect();
+        println!("      {}", detail.join(" "));
         if !x.pages.is_empty() {
             let shown: Vec<String> = x.pages.iter().take(12).map(u32::to_string).collect();
             println!("      pages {}{}", shown.join(", "), if x.pages.len() > 12 { ", …" } else { "" });
@@ -101,7 +149,7 @@ fn main() {
                 size(p.savings[2])
             );
             for i in &p.issues {
-                println!("          · {}", i.text);
+                println!("          · {}", text.say(&i.message));
             }
         }
     }

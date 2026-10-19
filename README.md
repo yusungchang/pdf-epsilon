@@ -23,6 +23,23 @@ Before anything is changed, PDF Epsilon shows:
 
 See [docs/ANALYZER.md](docs/ANALYZER.md) for how it works.
 
+## Languages
+
+The interface is in English and Korean. It follows the system language, and there is a
+picker in the top corner. Every word shown lives in [ui/locales/](ui/locales/), one JSON
+file per language. The engine writes no text of its own; it sends message keys and values,
+and the interface fills them in for the chosen language.
+
+To add a language:
+
+1. Copy `ui/locales/en.json` to `ui/locales/<code>.json`, for example `ja.json`, and translate
+   the values. Keep every `{placeholder}`. A value can be a plain string or, where it has a
+   `{count}`, an object of plural forms such as `{"one": "...", "other": "..."}`, following
+   the language's [plural rules](https://www.unicode.org/cldr/charts/latest/supplemental/language_plural_rules.html).
+2. Add the language to `LANGUAGES` at the top of `ui/app.js`, under its own name.
+3. Run `cargo test -p epsilon --release`. It checks that every language has exactly the keys
+   and placeholders of English.
+
 Website: <https://pdfepsilon.com> (domain not yet registered).
 Source: <https://github.com/yusungchang/pdf-epsilon>.
 

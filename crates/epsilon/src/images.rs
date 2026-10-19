@@ -222,44 +222,45 @@ fn process(doc: &Document, stream: &Stream, policy: &ImagePolicy, job: Job) -> O
     Some(Done { stream: new_stream, downsampled: downsample, reencoded: true })
 }
 
-/// Why this module will not touch an image, or `None` when it can try.
+/// Why this module will not touch an image, as a code (`cmyk`, `jpeg2000`, ...), or `None`
+/// when it can try. The interface translates the code; see `imageReason.*` in `ui/locales`.
 /// Decoding can still fail later, in which case the image is also left alone.
 pub fn unsupported(doc: &Document, dict: &Dictionary, is_soft_mask: bool) -> Option<&'static str> {
     if dict.get(b"ImageMask").and_then(|o| o.as_bool()).unwrap_or(false) {
-        return Some("stencil mask");
+        return Some("stencilMask");
     }
     if dict.has(b"Decode") {
-        return Some("/Decode array");
+        return Some("decodeArray");
     }
     if matches!(dict.get(b"Mask"), Ok(Object::Array(_))) {
-        return Some("colour-key mask");
+        return Some("colourKeyMask");
     }
     let filters = filters(dict);
     let is_jpeg = match filters.as_slice() {
         [] => false,
         [f] if f == b"DCTDecode" => true,
         [f] if f == b"FlateDecode" || f == b"LZWDecode" => false,
-        [f] if f == b"JPXDecode" => return Some("JPEG 2000"),
-        [f] if f == b"JBIG2Decode" => return Some("JBIG2"),
-        [f] if f == b"CCITTFaxDecode" => return Some("CCITT fax"),
-        [_] => return Some("unusual filter"),
-        _ => return Some("chained filters"),
+        [f] if f == b"JPXDecode" => return Some("jpeg2000"),
+        [f] if f == b"JBIG2Decode" => return Some("jbig2"),
+        [f] if f == b"CCITTFaxDecode" => return Some("ccittFax"),
+        [_] => return Some("unusualFilter"),
+        _ => return Some("chainedFilters"),
     };
     if colour_space(doc, dict, is_soft_mask).is_none() {
         return Some(match colour_name(doc, dict).as_str() {
-            "CMYK" => "CMYK",
-            "Indexed" => "indexed colour",
-            "Separation" | "DeviceN" => "spot colour",
-            "Lab" => "Lab colour",
-            _ => "unusual colour space",
+            "CMYK" => "cmyk",
+            "Indexed" => "indexed",
+            "Separation" | "DeviceN" => "spotColour",
+            "Lab" => "lab",
+            _ => "unusualColourSpace",
         });
     }
     if !is_jpeg {
         match int(doc, dict, b"BitsPerComponent").unwrap_or(8) {
             8 => {}
-            1 => return Some("1-bit"),
-            16 => return Some("16-bit"),
-            _ => return Some("unusual bit depth"),
+            1 => return Some("oneBit"),
+            16 => return Some("sixteenBit"),
+            _ => return Some("unusualBitDepth"),
         }
     }
     None

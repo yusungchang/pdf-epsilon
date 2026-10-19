@@ -80,7 +80,12 @@ body {
 }
 button { font: inherit; color: inherit; }
 
-header { padding: 20px 24px 8px; }
+header { padding: 20px 24px 8px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.language select {
+  font: inherit; font-size: 13px; color: var(--ink); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 7px; padding: 4px 8px; cursor: pointer;
+}
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .brand { display: flex; align-items: center; gap: 12px; }
 /* The app icon has a transparent margin, so it is drawn a little larger than the space it takes. */
 .mark { width: 52px; height: 52px; margin: -6px; }

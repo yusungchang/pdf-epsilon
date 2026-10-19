@@ -9,13 +9,15 @@ const P = [
   { id: "small", options: { ...base, images: { maxDpi: 96, jpegQuality: 60 }, stripPrivateData: true, stripMetadata: true } },
 ];
 const analyses = window.__ANALYSES__ || {};
+// preview.sh sets the language through PREVIEW_LANG.
+if (window.__LANG__) localStorage.setItem("language", JSON.stringify(window.__LANG__));
 window.__TAURI__ = {
   core: { invoke: async (cmd, args) => {
     if (cmd === "presets") return P;
     if (cmd === "analyze") {
       const name = args.path.split("/").pop();
       await new Promise((r) => setTimeout(r, 50));
-      if (!analyses[name]) throw "encrypted PDFs are not supported yet";
+      if (!analyses[name]) throw { code: "encrypted", detail: "" };
       return analyses[name];
     }
     if (cmd === "compress") {

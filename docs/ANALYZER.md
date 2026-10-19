@@ -3,6 +3,7 @@
 PDF Epsilon explains a file before it changes it: where the bytes go, what each preset saves, what
 else could be reduced, and all of this page by page. The code is `crates/epsilon/src/analyze.rs`,
 and the entry point is `epsilon::analyze_bytes`. It writes nothing.
+Its texts are message keys with values, rendered by the interface from `ui/locales`.
 
 ## How it works
 

@@ -2,7 +2,8 @@
 # Screenshot the interface in headless Chrome, without Tauri.
 # mock.js stands in for window.__TAURI__. The PDFs given are analysed with the real
 # engine (the inspect example) and their reports are shown; a fake encrypted file is added.
-# Usage: tools/ui-preview/preview.sh out.png [light|dark] [height] file.pdf...
+# The page is served over a local web server, because the interface fetches its language file.
+# Usage: [PREVIEW_LANG=ko] tools/ui-preview/preview.sh out.png [light|dark] [height] file.pdf...
 set -e
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
@@ -11,7 +12,7 @@ scheme=${2:-light}
 height=${3:-1000}
 shift 3 2>/dev/null || shift $#
 work=$(mktemp -d)
-cp "$root"/ui/* "$work"/
+cp -R "$root"/ui/. "$work"/
 cp "$here/mock.js" "$work"/
 (cd "$root" && cargo build -q -p epsilon --release --example inspect)
 inspect="$root/target.nosync/release/examples/inspect"
@@ -22,11 +23,16 @@ for pdf in "$@"; do
   printf ',\n' >> "$work/analyses.js"
 done
 printf '};\n' >> "$work/analyses.js"
+[ -n "$PREVIEW_LANG" ] && printf 'window.__LANG__ = "%s";\n' "$PREVIEW_LANG" >> "$work/analyses.js"
 sed -i.bak 's|<script src="app.js"></script>|<script src="analyses.js"></script><script src="mock.js"></script><script src="app.js"></script>|' "$work/index.html"
+port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
+python3 -m http.server "$port" --bind 127.0.0.1 --directory "$work" >/dev/null 2>&1 &
+server=$!
+trap 'kill $server 2>/dev/null; rm -rf "$work"' EXIT
+sleep 0.5
 chrome="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 # perl's alarm is a portable timeout: headless Chrome can hang on some flags.
 perl -e 'alarm 60; exec @ARGV' "$chrome" --headless=new --disable-gpu --hide-scrollbars \
   --user-data-dir="$work/profile" --window-size=820,"$height" --virtual-time-budget=6000 \
-  --force-prefers-color-scheme="$scheme" --allow-file-access-from-files \
-  --enable-logging=stderr --screenshot="$out" "file://$work/index.html" 2>&1 | grep -iE "uncaught|written" || true
-rm -rf "$work"
+  --force-prefers-color-scheme="$scheme" \
+  --enable-logging=stderr --screenshot="$out" "http://127.0.0.1:$port/index.html" 2>&1 | grep -iE "uncaught|written" || true

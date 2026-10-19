@@ -18,6 +18,7 @@ use lopdf::xref::XrefEntry;
 use lopdf::{Dictionary, Document, Object, ObjectId};
 use serde::Serialize;
 
+use crate::message::{msg, Bytes, Message, Term};
 use crate::placement::{self, Draw};
 use crate::{images, Error, Preset, Result, Run};
 
@@ -171,8 +172,9 @@ pub struct Finding {
     pub kind: &'static str,
     pub severity: Severity,
     pub status: Status,
-    pub title: String,
-    pub detail: String,
+    pub title: Message,
+    /// Sentences, shown one after another.
+    pub detail: Vec<Message>,
     /// Bytes of the file this finding is about.
     pub bytes: u64,
     /// Measured saving for each preset, in [`Preset::ALL`] order.
@@ -210,7 +212,7 @@ pub struct PageInfo {
 pub struct PageIssue {
     pub kind: &'static str,
     pub status: Status,
-    pub text: String,
+    pub message: Message,
     pub bytes: u64,
 }
 
@@ -233,7 +235,7 @@ pub struct ImageInfo {
     /// Largest share of the image that falls inside the visible page, 0 to 1.
     /// Clipping paths are not taken into account, so the real share can be smaller.
     pub visible: Option<f32>,
-    /// Why PDF Epsilon leaves it alone, when it does.
+    /// Why PDF Epsilon leaves it alone, when it does, as a code such as `cmyk`. See `imageReason.*`.
     pub unsupported: Option<String>,
     /// What each preset makes of it, in [`Preset::ALL`] order. `None` means unchanged.
     pub results: Vec<Option<ImageResult>>,
@@ -720,7 +722,7 @@ impl<'a> Inspector<'a> {
                 info.issues.push(PageIssue {
                     kind: "uncompressedContent",
                     status: Status::Fixed,
-                    text: format!("Drawing instructions stored uncompressed ({})", bytes(raw_content)),
+                    message: msg!("issue.uncompressedContent", size = Bytes(raw_content)),
                     bytes: raw_content,
                 });
             }
@@ -728,7 +730,7 @@ impl<'a> Inspector<'a> {
                 info.issues.push(PageIssue {
                     kind: "heavyContent",
                     status: Status::NotYet,
-                    text: format!("{} of drawing instructions: very detailed vector art or text drawn as shapes", bytes(info.content)),
+                    message: msg!("issue.heavyContent", size = Bytes(info.content)),
                     bytes: info.content,
                 });
             }
@@ -744,10 +746,7 @@ impl<'a> Inspector<'a> {
                     }
                 }
             }
-            let shared = |img: &ImageInfo| {
-                if img.pages.len() > 1 { format!(", on {} pages", img.pages.len()) } else { String::new() }
-            };
-            let mut oversized: Vec<(u64, String)> = Vec::new();
+            let mut oversized: Vec<(u64, Message)> = Vec::new();
             for id in &drawn {
                 let Some(img) = image_by_obj.get(&id.0) else { continue };
                 let uses = img.pages.len().max(1) as u64;
@@ -758,25 +757,52 @@ impl<'a> Inspector<'a> {
                     continue;
                 }
                 let share = img.bytes / uses;
-                let label = format!("{}×{} {}", img.width, img.height, img.colour);
+                let colour = || Term(format!("colour.{}", img.colour));
                 if let Some(reason) = &img.unsupported {
                     if img.bytes >= 50_000 {
                         info.issues.push(PageIssue {
                             kind: "unsupportedImage",
                             status: Status::NotYet,
-                            text: format!("{label} image ({}) left as is: {reason}", bytes(img.bytes)),
+                            message: msg!(
+                                "issue.unsupportedImage",
+                                width = img.width,
+                                height = img.height,
+                                colour = colour(),
+                                size = Bytes(img.bytes),
+                                reason = Term(format!("imageReason.{reason}")),
+                            ),
                             bytes: share,
                         });
                     }
                 } else if let Some(ppi) = img.ppi.filter(|p| *p > 150.0 * 1.25) {
-                    oversized.push((share, format!("{label} image ({}) shown at {} ppi{}", bytes(img.bytes), ppi.round(), shared(img))));
+                    let message = if img.pages.len() > 1 {
+                        msg!(
+                            "issue.oversizedImageShared",
+                            width = img.width,
+                            height = img.height,
+                            colour = colour(),
+                            size = Bytes(img.bytes),
+                            ppi = ppi.round(),
+                            pages = img.pages.len(),
+                        )
+                    } else {
+                        msg!(
+                            "issue.oversizedImage",
+                            width = img.width,
+                            height = img.height,
+                            colour = colour(),
+                            size = Bytes(img.bytes),
+                            ppi = ppi.round(),
+                        )
+                    };
+                    oversized.push((share, message));
                 }
                 if let Some(v) = img.visible.filter(|v| *v < 0.7) {
                     if img.bytes >= 50_000 {
                         info.issues.push(PageIssue {
                             kind: "offpageImage",
                             status: Status::NotYet,
-                            text: format!("Only {}% of a {} image is inside the page", (v * 100.0).round(), bytes(img.bytes)),
+                            message: msg!("issue.offpageImage", percent = (v * 100.0).round(), size = Bytes(img.bytes)),
                             bytes: share,
                         });
                     }
@@ -784,21 +810,19 @@ impl<'a> Inspector<'a> {
             }
             oversized.sort_by(|a, b| b.0.cmp(&a.0));
             let listed = oversized.iter().take_while(|o| o.0 >= 20_000).take(3).count();
-            for (share, text) in oversized.drain(..listed) {
-                info.issues.push(PageIssue { kind: "oversizedImage", status: Status::Fixed, text, bytes: share });
+            for (share, message) in oversized.drain(..listed) {
+                info.issues.push(PageIssue { kind: "oversizedImage", status: Status::Fixed, message, bytes: share });
             }
             if !oversized.is_empty() {
                 let rest: u64 = oversized.iter().map(|o| o.0).sum();
                 info.issues.push(PageIssue {
                     kind: "oversizedImage",
                     status: Status::Fixed,
-                    text: format!(
-                        "{}{} image{} above 187 ppi ({})",
-                        oversized.len(),
-                        if listed > 0 { " more" } else { "" },
-                        plural(oversized.len()),
-                        bytes(rest)
-                    ),
+                    message: if listed > 0 {
+                        msg!("issue.oversizedMore", count = oversized.len(), size = Bytes(rest))
+                    } else {
+                        msg!("issue.oversizedImages", count = oversized.len(), size = Bytes(rest))
+                    },
                     bytes: rest,
                 });
             }
@@ -806,12 +830,7 @@ impl<'a> Inspector<'a> {
                 info.issues.push(PageIssue {
                     kind: "inlineImages",
                     status: Status::NotYet,
-                    text: format!(
-                        "{} inline image{} ({}) inside the drawing instructions",
-                        walk.inline_images.0,
-                        plural(walk.inline_images.0),
-                        bytes(walk.inline_images.1)
-                    ),
+                    message: msg!("issue.inlineImages", count = walk.inline_images.0, size = Bytes(walk.inline_images.1)),
                     bytes: walk.inline_images.1,
                 });
             }
@@ -834,7 +853,7 @@ impl<'a> Inspector<'a> {
                     info.issues.push(PageIssue {
                         kind: "fullFont",
                         status: Status::NotYet,
-                        text: format!("Font {} embedded in full ({}), first used here", f.name, bytes(f.program_bytes)),
+                        message: msg!("issue.fullFont", name = f.name.as_str(), size = Bytes(f.program_bytes)),
                         bytes: f.program_bytes,
                     });
                 }
@@ -860,7 +879,7 @@ impl<'a> Inspector<'a> {
                     info.issues.push(PageIssue {
                         kind: "thumbnail",
                         status: Status::Fixed,
-                        text: format!("Embedded thumbnail ({})", bytes(thumb)),
+                        message: msg!("issue.thumbnail", size = Bytes(thumb)),
                         bytes: thumb,
                     });
                 }
@@ -868,7 +887,7 @@ impl<'a> Inspector<'a> {
                     info.issues.push(PageIssue {
                         kind: "editorData",
                         status: Status::Fixed,
-                        text: format!("Editor data for re-editing in its source app ({})", bytes(editor)),
+                        message: msg!("issue.editorData", size = Bytes(editor)),
                         bytes: editor,
                     });
                 }
@@ -879,7 +898,7 @@ impl<'a> Inspector<'a> {
                 info.issues.push(PageIssue {
                     kind: "unreadable",
                     status: Status::Warning,
-                    text: "Drawing instructions could not be fully read; figures for this page are incomplete".into(),
+                    message: msg!("issue.unreadable"),
                     bytes: 0,
                 });
             }
@@ -1009,7 +1028,8 @@ impl Inspected {
             _ => Severity::Low,
         };
         let mut out: Vec<Finding> = Vec::new();
-        let mut push = |kind, status, title: String, detail: String, b: u64, savings: Vec<u64>, pages: Vec<u32>| {
+        let none = || vec![0; Preset::ALL.len()];
+        let mut push = |kind, status, title: Message, detail: Vec<Message>, b: u64, savings: Vec<u64>, pages: Vec<u32>| {
             let best = savings.iter().copied().max().unwrap_or(0);
             let sev = match status {
                 Status::Warning | Status::Kept => Severity::Info,
@@ -1047,12 +1067,8 @@ impl Inspected {
             push(
                 "oversizedImages",
                 Status::Fixed,
-                format!("{} image{} stored at more detail than shown", oversized.len(), plural(oversized.len())),
-                format!(
-                    "Resolution is measured from the size each image is drawn on the page. The sharpest is {} ppi as placed; \
-                     150 ppi is sharp on screen and 300 ppi in print. Downsampling is lossy.",
-                    top.round()
-                ),
+                msg!("finding.oversizedImages.title", count = oversized.len()),
+                vec![msg!("finding.oversizedImages.detail", ppi = top.round())],
                 b,
                 image_savings(&oversized),
                 pages_of(&oversized),
@@ -1073,10 +1089,8 @@ impl Inspected {
             push(
                 "recodableImages",
                 Status::Fixed,
-                format!("{} more image{} can be made smaller", recodable.len(), plural(recodable.len())),
-                "Their resolution already suits the screen. Photographs stored losslessly or as heavy JPEGs can be \
-                 re-encoded, and Small also lowers them to 96 ppi. Both are lossy; flat graphics stay lossless."
-                    .into(),
+                msg!("finding.recodableImages.title", count = recodable.len()),
+                vec![msg!("finding.recodableImages.detail")],
                 b,
                 image_savings(&recodable),
                 pages_of(&recodable),
@@ -1095,16 +1109,18 @@ impl Inspected {
                 continue;
             }
             let over = imgs.iter().filter(|i| i.ppi.map(|p| p > 187.5).unwrap_or(false)).count();
+            let term = || Term(format!("imageReason.{reason}"));
+            let mut detail = vec![msg!("finding.unsupportedImages.detail", reason = term())];
+            if over > 0 {
+                detail.push(msg!("finding.unsupportedImages.over", count = over));
+            }
             push(
                 "unsupportedImages",
                 Status::NotYet,
-                format!("{} {reason} image{} left as is", imgs.len(), plural(imgs.len())),
-                format!(
-                    "PDF Epsilon does not recompress {reason} images yet, so these are kept exactly as they are.{}",
-                    if over > 0 { format!(" {over} of them are drawn above 187 ppi and could be downsampled once supported.") } else { String::new() }
-                ),
+                msg!("finding.unsupportedImages.title", count = imgs.len(), reason = term()),
+                detail,
                 b,
-                vec![0; Preset::ALL.len()],
+                none(),
                 pages_of(&imgs),
             );
         }
@@ -1117,14 +1133,10 @@ impl Inspected {
             push(
                 "offpageImages",
                 Status::NotYet,
-                format!("{} image{} mostly outside the page", offpage.len(), plural(offpage.len())),
-                format!(
-                    "Parts of these images fall outside the visible page and are never seen; as little as {}% of one is \
-                     visible. Clipping paths are not counted, so even less may show. Cropping them is planned.",
-                    (least * 100.0).round()
-                ),
+                msg!("finding.offpageImages.title", count = offpage.len()),
+                vec![msg!("finding.offpageImages.detail", percent = (least * 100.0).round())],
                 b,
-                vec![0; Preset::ALL.len()],
+                none(),
                 pages_of(&offpage),
             );
         }
@@ -1135,12 +1147,10 @@ impl Inspected {
             push(
                 "undrawnImages",
                 Status::Kept,
-                format!("{} image{} not drawn on any page", undrawn.len(), plural(undrawn.len())),
-                "They are referenced by the file, for example from annotations, patterns or page resources, \
-                 but were not found in page content. They are kept, and only compressed to the page size."
-                    .into(),
+                msg!("finding.undrawnImages.title", count = undrawn.len()),
+                vec![msg!("finding.undrawnImages.detail")],
                 undrawn_bytes,
-                vec![0; Preset::ALL.len()],
+                none(),
                 Vec::new(),
             );
         }
@@ -1149,19 +1159,19 @@ impl Inspected {
         let full: Vec<&FontInfo> = self.fonts.iter().filter(|f| f.embedded && !f.subset && f.program_bytes >= 20_000).collect();
         if !full.is_empty() {
             let b = full.iter().map(|f| f.program_bytes).sum();
-            let names: Vec<&str> = full.iter().take(4).map(|f| f.name.as_str()).collect();
+            let names: Vec<String> = full.iter().take(4).map(|f| f.name.clone()).collect();
+            let names = if full.len() > 4 {
+                msg!("finding.fullFonts.namesAndMore", names = names, count = full.len() - 4)
+            } else {
+                msg!("finding.fullFonts.names", names = names)
+            };
             push(
                 "fullFonts",
                 Status::NotYet,
-                format!("{} font{} embedded in full", full.len(), plural(full.len())),
-                format!(
-                    "{}{}. Every glyph is stored, not just the ones used. Subsetting keeps only the characters \
-                     on the pages and is the largest planned improvement for text-heavy files.",
-                    names.join(", "),
-                    if full.len() > 4 { format!(" and {} more", full.len() - 4) } else { String::new() }
-                ),
+                msg!("finding.fullFonts.title", count = full.len()),
+                vec![names, msg!("finding.fullFonts.detail")],
                 b,
-                vec![0; Preset::ALL.len()],
+                none(),
                 full.iter().flat_map(|f| f.pages.first().copied()).collect::<BTreeSet<_>>().into_iter().collect(),
             );
         }
@@ -1180,21 +1190,14 @@ impl Inspected {
             .sum();
         if repeated_bytes >= 20_000 {
             let copies: usize = repeated.iter().map(|(_, v)| v.len()).sum();
+            let examples: Vec<String> = repeated.iter().take(4).map(|(n, v)| format!("{n} ×{}", v.len())).collect();
             push(
                 "repeatedFonts",
                 Status::NotYet,
-                format!(
-                    "{} typeface{} embedded more than once ({copies} copies)",
-                    repeated.len(),
-                    plural(repeated.len())
-                ),
-                format!(
-                    "The same typeface is stored as separate subsets, typical of merged PDFs: {}. Merging them into one \
-                     copy each needs font rewriting and is planned.",
-                    repeated.iter().take(4).map(|(n, v)| format!("{n} ×{}", v.len())).collect::<Vec<_>>().join(", ")
-                ),
+                msg!("finding.repeatedFonts.title", count = repeated.len(), copies = copies),
+                vec![msg!("finding.repeatedFonts.detail", fonts = examples)],
                 repeated_bytes,
-                vec![0; Preset::ALL.len()],
+                none(),
                 Vec::new(),
             );
         }
@@ -1206,10 +1209,8 @@ impl Inspected {
             push(
                 "duplicates",
                 Status::Fixed,
-                format!("{merged} duplicate stream{}", plural(merged)),
-                "Identical images, fonts or drawings are stored more than once. Every preset keeps one copy and points \
-                 everything at it. This is lossless."
-                    .into(),
+                msg!("finding.duplicates.title", count = merged),
+                vec![msg!("finding.duplicates.detail")],
                 *dup.iter().max().unwrap(),
                 dup,
                 Vec::new(),
@@ -1220,8 +1221,8 @@ impl Inspected {
             push(
                 "thumbnails",
                 Status::Fixed,
-                "Embedded page thumbnails".into(),
-                "Previews stored for old viewers. Every current viewer draws its own, so every preset removes them.".into(),
+                msg!("finding.thumbnails.title"),
+                vec![msg!("finding.thumbnails.detail")],
                 thumbs,
                 self.savings_of(SavingKind::Thumbnails),
                 self.pages.iter().filter(|p| p.issues.iter().any(|i| i.kind == "thumbnail")).map(|p| p.number).collect(),
@@ -1232,10 +1233,8 @@ impl Inspected {
             push(
                 "editorData",
                 Status::Fixed,
-                "Editor data from Illustrator or Photoshop".into(),
-                "A private copy that lets the source application re-open the file fully editable. The pages look the \
-                 same without it. Balanced and Small remove it."
-                    .into(),
+                msg!("finding.editorData.title"),
+                vec![msg!("finding.editorData.detail")],
                 editor,
                 self.savings_of(SavingKind::EditorData),
                 self.pages.iter().filter(|p| p.issues.iter().any(|i| i.kind == "editorData")).map(|p| p.number).collect(),
@@ -1243,14 +1242,15 @@ impl Inspected {
         }
         let xmp = self.xmp;
         if xmp >= 4096 {
+            let mut detail = vec![msg!("finding.metadata.detail")];
+            if self.file.pdfa.is_some() {
+                detail.push(msg!("finding.metadata.pdfa"));
+            }
             push(
                 "metadata",
                 Status::Fixed,
-                "XMP metadata".into(),
-                format!(
-                    "Descriptive data such as editing history. Only Small removes it{}.",
-                    if self.file.pdfa.is_some() { ", which breaks this file's PDF/A conformance" } else { "" }
-                ),
+                msg!("finding.metadata.title"),
+                detail,
                 xmp,
                 self.savings_of(SavingKind::Metadata),
                 Vec::new(),
@@ -1261,8 +1261,8 @@ impl Inspected {
             push(
                 "unusedObjects",
                 Status::Fixed,
-                "Objects nothing refers to".into(),
-                "Left behind by earlier edits. They are not part of the document, and every preset drops them.".into(),
+                msg!("finding.unusedObjects.title"),
+                vec![msg!("finding.unusedObjects.detail")],
                 unused,
                 self.savings_of(SavingKind::Unused),
                 Vec::new(),
@@ -1271,47 +1271,31 @@ impl Inspected {
         let rewrite = self.savings_of(SavingKind::Rewrite);
         let rewrite_top = rewrite.iter().copied().max().unwrap_or(0);
         if rewrite_top * 200 >= total {
-            let mut why = Vec::new();
-            if !self.file.object_streams {
-                why.push("objects are stored one by one instead of in compressed object streams".to_string());
-            }
-            if self.uncompressed.1 > 0 {
-                why.push(format!("{} of drawing instructions are stored uncompressed", bytes(self.uncompressed.0)));
-            }
-            let (title, lead) = if self.file.revisions > 1 {
+            let (title, mut detail) = if self.file.revisions > 1 {
                 (
-                    format!("Saved {} times on top of itself", self.file.revisions),
-                    format!(
-                        "Each incremental save appends its changes and keeps the earlier version, about {} here. \
-                         Rewriting keeps only the current version, which also ends any revision history a \
-                         signature relies on",
-                        bytes(self.overhead)
-                    ),
+                    msg!("finding.rewrite.revisionsTitle", count = self.file.revisions),
+                    vec![msg!("finding.rewrite.revisionsDetail", size = Bytes(self.overhead))],
                 )
             } else {
-                ("The file structure can be packed tighter".to_string(), "Repacking is lossless".to_string())
+                (msg!("finding.rewrite.title"), vec![msg!("finding.rewrite.detail")])
             };
-            push(
-                "rewrite",
-                Status::Fixed,
-                title,
-                if why.is_empty() { format!("{lead}.") } else { format!("{lead}. Also, {}.", why.join("; ")) },
-                rewrite_top,
-                rewrite,
-                Vec::new(),
-            );
+            if !self.file.object_streams {
+                detail.push(msg!("finding.rewrite.noObjectStreams"));
+            }
+            if self.uncompressed.1 > 0 {
+                detail.push(msg!("finding.rewrite.uncompressed", size = Bytes(self.uncompressed.0)));
+            }
+            push("rewrite", Status::Fixed, title, detail, rewrite_top, rewrite, Vec::new());
         }
         let heavy: Vec<&PageInfo> = self.pages.iter().filter(|p| p.issues.iter().any(|i| i.kind == "heavyContent")).collect();
         if !heavy.is_empty() {
             push(
                 "heavyContent",
                 Status::NotYet,
-                format!("{} page{} with very heavy drawing instructions", heavy.len(), plural(heavy.len())),
-                "Detailed vector art, charts with many points, or text converted to outlines. Simplifying it would change \
-                 the drawing, so it is left as is."
-                    .into(),
+                msg!("finding.heavyContent.title", count = heavy.len()),
+                vec![msg!("finding.heavyContent.detail")],
                 heavy.iter().map(|p| p.content).sum(),
-                vec![0; Preset::ALL.len()],
+                none(),
                 heavy.iter().map(|p| p.number).collect(),
             );
         }
@@ -1319,16 +1303,14 @@ impl Inspected {
         // Kept on purpose, and warnings.
         if !self.attachments.is_empty() {
             let b = self.attachments.iter().map(|a| a.bytes).sum();
+            let names: Vec<String> = self.attachments.iter().take(4).map(|a| a.name.clone()).collect();
             push(
                 "attachments",
                 Status::Kept,
-                format!("{} attached file{}", self.attachments.len(), plural(self.attachments.len())),
-                format!(
-                    "{}. Attachments are never removed automatically.",
-                    self.attachments.iter().take(4).map(|a| format!("{} ({})", a.name, bytes(a.bytes))).collect::<Vec<_>>().join(", ")
-                ),
+                msg!("finding.attachments.title", count = self.attachments.len()),
+                vec![msg!("finding.attachments.detail", names = names)],
                 b,
-                vec![0; Preset::ALL.len()],
+                none(),
                 Vec::new(),
             );
         }
@@ -1337,10 +1319,10 @@ impl Inspected {
             push(
                 "tagging",
                 Status::Kept,
-                "Accessibility tags".into(),
-                "The structure tree lets screen readers follow the document and reflow it. It is always kept.".into(),
+                msg!("finding.tagging.title"),
+                vec![msg!("finding.tagging.detail")],
                 tags,
-                vec![0; Preset::ALL.len()],
+                none(),
                 Vec::new(),
             );
         }
@@ -1348,12 +1330,10 @@ impl Inspected {
             push(
                 "signed",
                 Status::Warning,
-                "This document is digitally signed".into(),
-                "Any compression rewrites the file, which makes the signature invalid. Keep the original wherever \
-                 the signature matters."
-                    .into(),
+                msg!("finding.signed.title"),
+                vec![msg!("finding.signed.detail")],
                 0,
-                vec![0; Preset::ALL.len()],
+                none(),
                 Vec::new(),
             );
         }
@@ -1361,10 +1341,10 @@ impl Inspected {
             push(
                 "pdfa",
                 Status::Warning,
-                format!("Archival PDF/A-{level}"),
-                "Small removes XMP metadata, which PDF/A requires. Use Balanced or a lighter preset to keep it archival.".into(),
+                msg!("finding.pdfa.title", level = level.as_str()),
+                vec![msg!("finding.pdfa.detail")],
                 0,
-                vec![0; Preset::ALL.len()],
+                none(),
                 Vec::new(),
             );
         }
@@ -1372,24 +1352,23 @@ impl Inspected {
             push(
                 "hiddenLayers",
                 Status::Warning,
-                "Hidden layers".into(),
-                "Some layers are switched off by default. Their content is kept and counted, even though it is not \
-                 visible."
-                    .into(),
+                msg!("finding.hiddenLayers.title"),
+                vec![msg!("finding.hiddenLayers.detail")],
                 0,
-                vec![0; Preset::ALL.len()],
+                none(),
                 Vec::new(),
             );
         }
         for (p, r) in Preset::ALL.iter().zip(runs) {
             if let Err(e) = r {
+                let preset = format!("{p:?}").to_lowercase();
                 push(
                     "presetFailed",
                     Status::Warning,
-                    format!("{p:?} could not be applied"),
-                    e.to_string(),
+                    msg!("finding.presetFailed.title", preset = Term(format!("preset.{preset}"))),
+                    vec![msg!("finding.presetFailed.detail", code = Term(format!("error.{}", e.code())), detail = e.detail())],
                     0,
-                    vec![0; Preset::ALL.len()],
+                    none(),
                     Vec::new(),
                 );
             }
@@ -1816,19 +1795,3 @@ fn pdfa_level(xmp: &[u8]) -> Option<String> {
     Some(format!("{part}{}", value("pdfaid:conformance").unwrap_or_default().to_uppercase()))
 }
 
-fn plural(n: usize) -> &'static str {
-    if n == 1 {
-        ""
-    } else {
-        "s"
-    }
-}
-
-/// Human-readable size for finding texts. The interface formats its own numbers.
-fn bytes(n: u64) -> String {
-    match n {
-        0..=1023 => format!("{n} B"),
-        1024..=1_048_575 => format!("{:.0} KB", n as f64 / 1024.0),
-        _ => format!("{:.1} MB", n as f64 / 1_048_576.0),
-    }
-}

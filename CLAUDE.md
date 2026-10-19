@@ -13,6 +13,9 @@ current state, verified results, design decisions and next steps. Then read `REA
   Output files are written with `create_new` and are never overwritten.
 - `ui` is plain JS with no bundler. Tauri APIs come from `window.__TAURI__`
   (`withGlobalTauri`).
+- `ui/locales/<lang>.json` holds every user-visible string. The engine returns
+  `Message { key, args }` (see `message.rs`) and error codes, never prose; the UI renders
+  them with `t()`. New text goes into `en.json` and every other locale in the same change.
 
 ## Rules
 
@@ -45,6 +48,8 @@ to the Versions table in `docs/HISTORY.md`. Update `docs/HANDOVER.md` when the s
 
 - `cargo test -p epsilon --release` builds a synthetic PDF and checks downsampling,
   lossless mode, Print, and that the analysis accounts for every byte and matches real runs.
+- `tests/locales.rs` fails when a key is used but missing, or a language's keys or
+  placeholders differ from English.
 - `cargo run -p epsilon --release --example inspect -- in.pdf --pages` prints the analysis.
   On real files, check that the categories add up to the file size (`--json`).
 - To check against real files, run the `squeeze` example on PDFs with photos, line art
