@@ -46,7 +46,18 @@ The version is `x.y.z`, kept in `Cargo.toml` (workspace), `package.json` and
 - x stays 0 until the owner says 1.0.
 
 Every change is recorded in `docs/HISTORY.md`: one line in the versions table, and a
-section listing what changed and why. Update `docs/HANDOVER.md` at the end of a session. Raise z in all three files with each change, and add a line
+section listing what changed and why. Update `docs/HANDOVER.md` at the end of a session.
+
+## Minor release routine
+
+After every y increase (0.3 → 0.4), and only then, before calling the version done:
+
+1. **Security review.** Check every new or changed parsing path against `docs/SECURITY.md`:
+   all decoding goes through `limits.rs`, nothing recurses or loops without a bound. Add
+   cases to `tests/hostile.rs` for new paths, rerun the hostile corpus by hand (bombs of
+   2 GB, a 500,000-object file), and record peak memory and time in `HISTORY.md`.
+2. **Release tag.** Once CI passes on `main`, tag `vX.Y.0` on that commit and push the tag,
+   which builds a draft release with every installer. z versions (0.3.1) are not tagged. Raise z in all three files with each change, and add a line
 to the Versions table in `docs/HISTORY.md`. Update `docs/HANDOVER.md` when the state changes.
 
 ## Check a change

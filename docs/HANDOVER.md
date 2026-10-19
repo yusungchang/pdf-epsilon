@@ -124,6 +124,12 @@ truncated PDF both give a clear "not a readable PDF" message.
 - **No license file.** The manifests say `UNLICENSED` until the owner chooses one.
 - **The domain is unregistered.** pdfepsilon.com showed no whois match on 19 October 2026, but it has not been bought.
 
+## Release routine
+
+Every y increase gets a security review and a `vX.Y.0` tag; z versions are not tagged
+(see `CLAUDE.md`). The `v0.3.0` draft release predates the 0.3.1 hostile-input hardening,
+so the next tagged release, `v0.4.0`, is the first to include it.
+
 ## Next steps
 
 1. **Test on other platforms.** The first push to `main` builds every installer. Download them from the run's
