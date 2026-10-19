@@ -83,7 +83,7 @@ async fn compress(job: Job) -> Result<Outcome, Failure> {
 }
 
 fn run(job: Job) -> Result<Outcome, Failure> {
-    let bytes = std::fs::read(&job.input)?;
+    let bytes = epsilon::read_input(&job.input)?;
     let (out, report) = epsilon::compress_bytes(&bytes, &job.options)?;
     if report.kept_original {
         return Ok(Outcome { output: None, report });

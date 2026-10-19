@@ -152,9 +152,9 @@ fn process(doc: &Document, stream: &Stream, policy: &ImagePolicy, job: Job) -> O
     if unsupported(doc, dict, job.is_soft_mask).is_some() {
         return None;
     }
-    let width = int(doc, dict, b"Width")? as u32;
-    let height = int(doc, dict, b"Height")? as u32;
-    if width == 0 || height == 0 {
+    let width = u32::try_from(int(doc, dict, b"Width")?).ok()?;
+    let height = u32::try_from(int(doc, dict, b"Height")?).ok()?;
+    if width == 0 || height == 0 || width as u64 * height as u64 > crate::limits::IMAGE_PIXELS {
         return None;
     }
     let space = colour_space(doc, dict, job.is_soft_mask)?;
@@ -176,7 +176,9 @@ fn process(doc: &Document, stream: &Stream, policy: &ImagePolicy, job: Job) -> O
         }
         [] => (raw_image(&stream.content, dict, doc, space, width, height)?, false),
         [f] if f == b"FlateDecode" || f == b"LZWDecode" => {
-            let data = stream.decompressed_content().ok()?;
+            // Never decode more than the pixels can use, so a bomb stops at the image's own size.
+            let expected = width as usize * height as usize * space.channels();
+            let data = crate::limits::decode(stream, expected.saturating_add(expected / 8 + 4096).min(crate::limits::STREAM))?;
             (raw_image(&data, dict, doc, space, width, height)?, false)
         }
         _ => return None,
@@ -234,6 +236,10 @@ pub fn unsupported(doc: &Document, dict: &Dictionary, is_soft_mask: bool) -> Opt
     }
     if matches!(dict.get(b"Mask"), Ok(Object::Array(_))) {
         return Some("colourKeyMask");
+    }
+    let pixels = int(doc, dict, b"Width").unwrap_or(0).max(0) as u64 * int(doc, dict, b"Height").unwrap_or(0).max(0) as u64;
+    if pixels > crate::limits::IMAGE_PIXELS {
+        return Some("tooLarge");
     }
     let filters = filters(dict);
     let is_jpeg = match filters.as_slice() {

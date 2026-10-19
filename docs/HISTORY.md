@@ -7,6 +7,31 @@
 | 0.1.0 | 2026-10-19 | First version: engine, Tauri shell, interface, icon, CI workflow, docs. |
 | 0.2.0 | 2026-10-19 | Analyzer: byte breakdown, measured preset savings, findings and page-by-page report. Installers for all platforms. English and Korean. |
 | 0.3.0 | 2026-10-19 | Font optimizer: unused font tables dropped, fully embedded TrueType CID fonts subset. Research on further optimizations. |
+| 0.3.1 | 2026-10-19 | Security hardening against hostile PDFs: bounded decoding everywhere, file size cap, hostile-file tests on all platforms. |
+
+## 0.3.1, 19 October 2026
+
+The owner asked whether reading a PDF could be an attack vector, on every platform.
+
+1. **Review.** PDF Epsilon never runs, renders or extracts a PDF, and its whole parsing path is Rust (lopdf,
+   `miniz_oxide`, `zune-jpeg`), so the risk is crashing, not code execution. The interface inserts file text
+   only as text, the CSP allows only the app's scripts, and output never overwrites.
+2. **Attack corpus.** 17 hostile PDFs were built, one per path: decompression bombs in content, object
+   streams, images, forms, fonts, glyph maps and metadata; huge predictors; a flood of drawing operations;
+   cycles; deep nesting; lying font tables; huge JPEG headers. There were no panics, hangs or stack overflows,
+   but memory was unbounded: a 12 KB file took 7.4 GB, and a 788-byte file 3.6 GB.
+3. **Fix (`limits.rs`).** Every decode is bounded, and documents load with a stream limit. Operations are
+   counted before decoding, images are capped at 100 megapixels, absurd predictor parameters are refused
+   before loading, and files over 2 GB are refused. With these, the same corpus peaks at 477 MB, whether its
+   bombs hold 512 MB or 2 GB.
+4. **Quadratic lopdf code.** A 46 MB file with 500,000 objects took 108 s and 4.7 GB. Profiling found lopdf's
+   `prune_objects` and `renumber_objects` checking visited objects against a list. Both were replaced with
+   linear versions (103 s became 2 s for one preset). Documents with over 100,000 objects are analysed one
+   preset at a time, and files estimated at over 1 million objects are refused before loading. Renumbering
+   now turns references to missing objects into null, as the specification says, so they cannot point at
+   a renumbered object.
+5. **Tests.** `tests/hostile.rs` runs 20 hostile files on a 1 MB stack, smaller than any platform's default.
+   CI now runs the tests on macOS, Windows and Linux. `docs/SECURITY.md` records the threat model.
 
 ## 0.3.0, 19 October 2026
 

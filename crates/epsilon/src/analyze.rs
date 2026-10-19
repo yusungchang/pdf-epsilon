@@ -279,7 +279,7 @@ pub struct Attachment {
 
 /// Analyse the PDF at `input`. Nothing is written.
 pub fn analyze_file(input: &std::path::Path) -> Result<Analysis> {
-    let bytes = std::fs::read(input)?;
+    let bytes = crate::read_input(input)?;
     analyze_bytes(&bytes)
 }
 
@@ -287,6 +287,17 @@ pub fn analyze_file(input: &std::path::Path) -> Result<Analysis> {
 pub fn analyze_bytes(input: &[u8]) -> Result<Analysis> {
     let started = Instant::now();
     let doc = crate::load(input)?;
+
+    // Large documents run the presets one after another: each copy of a document costs a few
+    // kilobytes per object, and five at once is too much for files with hundreds of thousands.
+    if doc.objects.len() > crate::limits::PARALLEL_OBJECTS {
+        let mut a = Inspector::new(input, &doc).inspect();
+        let runs: Vec<Result<Run>> = Preset::ALL.iter().map(|p| crate::optimize(input, doc.clone(), &p.options())).collect();
+        a.apply_runs(&runs);
+        let mut analysis = a.finish();
+        analysis.millis = started.elapsed().as_millis() as u64;
+        return Ok(analysis);
+    }
 
     // Every preset runs on its own copy, at the same time as the inspection below.
     let (runs, mut a) = std::thread::scope(|s| {
@@ -463,7 +474,7 @@ impl<'a> Inspector<'a> {
             .and_then(|o| o.as_reference().ok())
             .and_then(|id| doc.get_object(id).ok())
             .and_then(|o| o.as_stream().ok())
-            .and_then(|s| s.decompressed_content().ok().or_else(|| Some(s.content.clone())))
+            .and_then(|s| crate::limits::decode(s, crate::limits::SMALL))
             .and_then(|xmp| pdfa_level(&xmp));
         FileInfo {
             bytes: self.input.len() as u64,

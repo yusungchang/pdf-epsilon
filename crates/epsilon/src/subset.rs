@@ -22,6 +22,7 @@ use lopdf::{Dictionary, Document, Object, ObjectId, Stream};
 
 use crate::analyze::{children, reachable};
 use crate::fonts::{self, Change, Table};
+use crate::limits;
 use crate::placement::{deref, lookup, page_resources};
 
 /// Subsets every font this module can handle. Returns the font programs that shrank.
@@ -96,11 +97,7 @@ pub fn subset_fonts(doc: &mut Document) -> Vec<Change> {
             continue;
         }
         let Ok(Object::Stream(stream)) = doc.get_object(program_id) else { continue };
-        let Ok(data) = stream.decompressed_content().or_else(|_| {
-            if stream.dict.has(b"Filter") { Err(()) } else { Ok(stream.content.clone()) }
-        }) else {
-            continue;
-        };
+        let Some(data) = limits::decode(stream, limits::FONT) else { continue };
         let Some(font) = subset_glyphs(&data, &p.gids) else { continue };
         let Some(encoded) = fonts::deflate(&font) else { continue };
         let before = stream.content.len();
@@ -195,7 +192,7 @@ fn cid_truetype(doc: &Document, font: &Dictionary) -> Option<Target> {
     let map = match cid.get(b"CIDToGIDMap").ok().map(|o| deref(doc, o)) {
         None => Some(GidMap::Identity),
         Some(Object::Name(n)) if n == b"Identity" => Some(GidMap::Identity),
-        Some(Object::Stream(s)) => s.decompressed_content().ok().or_else(|| (!s.dict.has(b"Filter")).then(|| s.content.clone())).map(GidMap::Table),
+        Some(Object::Stream(s)) => limits::decode(s, limits::SMALL).map(GidMap::Table),
         _ => None,
     };
     Some(Target { program, descendant, descriptor, map })
@@ -220,9 +217,9 @@ impl Usage {
         let mut u = Usage::default();
         for page_id in doc.get_pages().into_values() {
             let resources = page_resources(doc, page_id);
-            match doc.get_page_content_with_limit(page_id, 512 << 20) {
-                Ok(content) => u.walk(doc, &content, &resources, 0),
-                Err(_) => u.give_up = true,
+            match limits::page_content(doc, page_id) {
+                Some(content) => u.walk(doc, &content, &resources, 0),
+                None => u.give_up = true,
             }
             // Annotation appearances: /AP holds streams, or dictionaries of streams by state.
             let annots = doc
@@ -332,14 +329,18 @@ impl Usage {
             resources.push(own.clone());
         }
         resources.extend_from_slice(inherited);
-        match s.decompressed_content().or_else(|_| if s.dict.has(b"Filter") { Err(()) } else { Ok(s.content.clone()) }) {
-            Ok(data) => self.walk(doc, &data, &resources, depth),
-            Err(_) => self.give_up = true,
+        match limits::decode(s, limits::CONTENT) {
+            Some(data) => self.walk(doc, &data, &resources, depth),
+            None => self.give_up = true,
         }
     }
 
     fn walk(&mut self, doc: &Document, content: &[u8], resources: &[Dictionary], depth: u32) {
         if depth > 16 {
+            self.give_up = true;
+            return;
+        }
+        if !limits::operations_ok(content) {
             self.give_up = true;
             return;
         }

@@ -166,6 +166,7 @@
   "imageReason.unusualColourSpace": "특이한 색 공간",
   "imageReason.oneBit": "1비트",
   "imageReason.sixteenBit": "16비트",
+  "imageReason.tooLarge": "안전하게 처리하기엔 너무 큼",
   "imageReason.unusualBitDepth": "특이한 비트 깊이",
 
   "issue.uncompressedContent": "그림 명령이 압축되지 않은 채 저장됨 ({size})",
@@ -238,6 +239,8 @@
   "error.io": "파일을 읽거나 쓰지 못했습니다.",
   "error.parse": "읽을 수 있는 PDF가 아닌 것 같습니다.",
   "error.encrypted": "암호화된 PDF는 아직 지원하지 않습니다.",
+  "error.tooLarge": "PDF Epsilon이 처리하기엔 파일이 너무 큽니다(2GB 초과).",
+  "error.tooComplex": "파일의 구성 요소가 너무 많아 PDF Epsilon이 안전하게 처리할 수 없습니다(개체 100만 개 초과).",
   "error.verify": "작아진 파일이 검증을 통과하지 못해 아무것도 저장하지 않았습니다. 원본은 그대로입니다.",
   "error.internal": "PDF Epsilon 내부에서 문제가 생겼습니다.",
   "error.start": "시작하지 못했습니다: {detail}"

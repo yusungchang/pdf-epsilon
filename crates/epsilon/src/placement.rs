@@ -100,8 +100,8 @@ pub fn display_sizes(doc: &Document) -> HashMap<ObjectId, Size> {
 /// Walks one page's content, calling `visit` for everything it draws.
 /// Returns false when the content could not be read or decoded.
 pub fn visit_page(doc: &Document, page_id: ObjectId, visit: &mut dyn FnMut(Draw)) -> bool {
-    // Bounded, so a malformed file cannot inflate without limit.
-    let Ok(content) = doc.get_page_content_with_limit(page_id, 512 << 20) else { return false };
+    // Bounded, so a hostile file cannot inflate without limit (see limits.rs).
+    let Some(content) = crate::limits::page_content(doc, page_id) else { return false };
     let resources = page_resources(doc, page_id);
     let mut visiting = HashSet::new();
     walk(doc, &content, &resources, Matrix::IDENTITY, visit, &mut visiting, 0)
@@ -155,6 +155,9 @@ fn walk(
     }
     // Content that does not decode (some inline images, broken producers) is skipped;
     // its images fall back to the page-size limit.
+    if !crate::limits::operations_ok(content) {
+        return false;
+    }
     let Ok(content) = Content::decode(content) else { return false };
     let mut ctm = base;
     let mut stack: Vec<Matrix> = Vec::new();
@@ -205,7 +208,7 @@ fn walk(
                         }
                         // Forms without their own resources use the page's.
                         form_resources.extend_from_slice(resources);
-                        if let Ok(data) = stream.decompressed_content() {
+                        if let Some(data) = crate::limits::decode(stream, crate::limits::CONTENT) {
                             walk(doc, &data, &form_resources, matrix.then(ctm), visit, visiting, depth + 1);
                         }
                         visiting.remove(&id);

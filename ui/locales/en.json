@@ -166,6 +166,7 @@
   "imageReason.unusualColourSpace": "unusual colour space",
   "imageReason.oneBit": "1-bit",
   "imageReason.sixteenBit": "16-bit",
+  "imageReason.tooLarge": "too large to process safely",
   "imageReason.unusualBitDepth": "unusual bit depth",
 
   "issue.uncompressedContent": "Drawing instructions stored uncompressed ({size})",
@@ -238,6 +239,8 @@
   "error.io": "Could not read or write the file.",
   "error.parse": "This does not look like a readable PDF.",
   "error.encrypted": "Encrypted PDFs are not supported yet.",
+  "error.tooLarge": "The file is too large for PDF Epsilon (over 2 GB).",
+  "error.tooComplex": "The file has too many parts for PDF Epsilon to handle safely (over a million objects).",
   "error.verify": "The smaller file failed verification, so nothing was written. The original is unchanged.",
   "error.internal": "Something went wrong inside PDF Epsilon.",
   "error.start": "Could not start: {detail}"

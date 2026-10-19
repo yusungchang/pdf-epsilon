@@ -20,8 +20,13 @@ concurrency:
 # bundles would land in src-tauri/target.nosync and the upload step would not find them.
 
 jobs:
+  # On all three platforms: the hostile-file tests check stack depth, which differs by OS.
   test:
-    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

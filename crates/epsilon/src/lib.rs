@@ -25,6 +25,7 @@ mod message;
 mod dedup;
 mod fonts;
 mod images;
+mod limits;
 mod placement;
 mod subset;
 
@@ -148,6 +149,10 @@ pub enum Error {
     Parse(String),
     #[error("encrypted PDFs are not supported yet")]
     Encrypted,
+    #[error("the file is larger than {} GB, the most PDF Epsilon reads", limits::FILE >> 30)]
+    TooLarge,
+    #[error("the file has more than {} objects, more than PDF Epsilon handles safely", limits::OBJECTS)]
+    TooComplex,
     #[error("the optimised file failed verification ({0}); the original was not changed")]
     Verify(String),
 }
@@ -160,6 +165,8 @@ impl Error {
             Error::Io(_) => "io",
             Error::Parse(_) => "parse",
             Error::Encrypted => "encrypted",
+            Error::TooLarge => "tooLarge",
+            Error::TooComplex => "tooComplex",
             Error::Verify(_) => "verify",
         }
     }
@@ -169,7 +176,7 @@ impl Error {
         match self {
             Error::Io(e) => e.to_string(),
             Error::Parse(d) | Error::Verify(d) => d.clone(),
-            Error::Encrypted => String::new(),
+            Error::Encrypted | Error::TooLarge | Error::TooComplex => String::new(),
         }
     }
 }
@@ -178,7 +185,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// Compress `input` into `output`. The input file is never modified.
 pub fn compress_file(input: &Path, output: &Path, options: &Options) -> Result<Report> {
-    let bytes = std::fs::read(input)?;
+    let bytes = read_input(input)?;
     let (out, report) = compress_bytes(&bytes, options)?;
     std::fs::write(output, out)?;
     Ok(report)
@@ -192,6 +199,14 @@ pub fn compress_bytes(input: &[u8], options: &Options) -> Result<(Vec<u8>, Repor
     Ok((run.bytes, run.report))
 }
 
+/// Reads a file, refusing one too large to hold in memory safely.
+pub fn read_input(path: &Path) -> Result<Vec<u8>> {
+    if std::fs::metadata(path)?.len() > limits::FILE {
+        return Err(Error::TooLarge);
+    }
+    Ok(std::fs::read(path)?)
+}
+
 /// Loads a PDF, refusing encrypted and page-less files.
 fn load(input: &[u8]) -> Result<Document> {
     // Checked on the raw bytes first: lopdf decrypts some files on load by itself and
@@ -200,7 +215,15 @@ fn load(input: &[u8]) -> Result<Document> {
     if has_encrypt_entry(input) {
         return Err(Error::Encrypted);
     }
-    let doc = Document::load_mem(input).map_err(|e| Error::Parse(e.to_string()))?;
+    // Hostile files: predictor rows sized to exhaust memory, and object or xref streams that
+    // inflate without end, are both stopped before or during loading. See limits.rs.
+    if !limits::raw_params_ok(input) {
+        return Err(Error::Parse("implausible stream parameters".into()));
+    }
+    if limits::raw_object_estimate(input) > limits::OBJECTS {
+        return Err(Error::TooComplex);
+    }
+    let doc = load_bounded(input).map_err(|e| Error::Parse(e.to_string()))?;
     if doc.is_encrypted() || doc.was_encrypted() {
         return Err(Error::Encrypted);
     }
@@ -251,15 +274,15 @@ fn optimize(input: &[u8], mut doc: Document, options: &Options) -> Result<Run> {
     let merged = if options.dedupe { dedup::merge_identical_streams(&mut doc) } else { Vec::new() };
     report.duplicates_merged = merged.len() as u32;
 
-    let pruned = doc.prune_objects();
+    let pruned = prune(&mut doc);
     report.objects_removed = objects_before.saturating_sub(doc.objects.len()) as u32;
-    doc.renumber_objects();
+    renumber(&mut doc);
     doc.compress();
 
     let out = save(&mut doc)?;
 
     // Verify: the result must parse and have the same pages.
-    let check = Document::load_mem(&out).map_err(|e| Error::Verify(e.to_string()))?;
+    let check = load_bounded(&out).map_err(|e| Error::Verify(e.to_string()))?;
     let check_pages = check.get_pages().len() as u32;
     if check_pages != pages {
         return Err(Error::Verify(format!("{check_pages} pages instead of {pages}")));
@@ -272,6 +295,55 @@ fn optimize(input: &[u8], mut doc: Document, options: &Options) -> Result<Run> {
     }
     report.output_bytes = out.len() as u64;
     Ok(Run { bytes: out, report, images: changed, fonts: slimmed, subsets, merged, pruned })
+}
+
+/// Removes every object nothing refers to and returns their ids. lopdf's own
+/// `prune_objects` checks visited objects against a list, which is quadratic: half a million
+/// objects took over 100 seconds. This uses a hash set.
+fn prune(doc: &mut Document) -> Vec<ObjectId> {
+    let live = analyze::reachable(doc);
+    let dead: Vec<ObjectId> = doc.objects.keys().filter(|id| !live.contains(id)).copied().collect();
+    for id in &dead {
+        doc.objects.remove(id);
+    }
+    dead
+}
+
+/// Numbers objects 1, 2, 3, ... in their current order and rewrites every reference. lopdf's
+/// `renumber_objects` is quadratic like its pruning. A reference to an object that does not
+/// exist becomes null, which is what the PDF specification says it means; left as it was,
+/// it could end up pointing at a different object.
+fn renumber(doc: &mut Document) {
+    let map: std::collections::HashMap<ObjectId, ObjectId> =
+        doc.objects.keys().enumerate().map(|(i, id)| (*id, (i as u32 + 1, 0))).collect();
+    fn rewrite(obj: &mut lopdf::Object, map: &std::collections::HashMap<ObjectId, ObjectId>) {
+        use lopdf::Object;
+        match obj {
+            Object::Reference(id) => match map.get(id) {
+                Some(new) => *id = *new,
+                None => *obj = Object::Null,
+            },
+            Object::Array(items) => items.iter_mut().for_each(|o| rewrite(o, map)),
+            Object::Dictionary(d) => d.iter_mut().for_each(|(_, o)| rewrite(o, map)),
+            Object::Stream(s) => s.dict.iter_mut().for_each(|(_, o)| rewrite(o, map)),
+            _ => {}
+        }
+    }
+    let old = std::mem::take(&mut doc.objects);
+    for (id, mut obj) in old {
+        rewrite(&mut obj, &map);
+        doc.objects.insert(map[&id], obj);
+    }
+    for (_, v) in doc.trailer.iter_mut() {
+        rewrite(v, &map);
+    }
+    doc.max_id = map.len() as u32;
+}
+
+fn load_bounded(bytes: &[u8]) -> lopdf::Result<Document> {
+    let mut options = lopdf::LoadOptions::default();
+    options.max_decompressed_size = Some(limits::STREAM);
+    Document::load_mem_with_options(bytes, options)
 }
 
 /// True when the file has an `/Encrypt` key followed by a delimiter, so `/EncryptMetadata`

@@ -1,7 +1,7 @@
 # Handover
 
 Where PDF Epsilon stands, what has been verified, and what to do next.
-Last updated 19 October 2026, at version 0.3.0.
+Last updated 19 October 2026, at version 0.3.1.
 
 ## The brief
 
@@ -28,6 +28,7 @@ The code is public at https://github.com/yusungchang/pdf-epsilon, branch `main`.
 | Desktop shell (`src-tauri`) | Done. Release build verified on macOS, Apple silicon. |
 | Interface (`ui`) | Done. Checked in headless Chrome with a mocked bridge serving real analyses. Not yet clicked through in the real app window. |
 | Font optimizer (`fonts.rs`, `subset.rs`) | Done for TrueType CID fonts. Checked by text and pixel comparison in MuPDF and macOS. |
+| Hostile-input hardening (`limits.rs`) | Done. Bounded decoding everywhere; 20 hostile-file tests on all platforms. See `SECURITY.md`. |
 | Languages (`ui/locales`) | English and Korean. Every string is in the locale files; tests check they match. |
 | CI and releases (`.github/workflows/build.yml`) | Builds installers for all three platforms on every push to `main` and on `v*` tags. First run started on 19 October 2026. |
 | Windows and Linux | Configured, never built or run. |

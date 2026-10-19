@@ -66,11 +66,7 @@ pub fn strip_tables(doc: &mut Document) -> Vec<Change> {
         if !truetype && !matches!(stream.dict.get(b"Subtype").and_then(|s| s.as_name()), Ok(b"OpenType")) {
             continue;
         }
-        let Ok(data) = stream.decompressed_content().or_else(|_| {
-            if stream.dict.has(b"Filter") { Err(()) } else { Ok(stream.content.clone()) }
-        }) else {
-            continue;
-        };
+        let Some(data) = crate::limits::decode(stream, crate::limits::FONT) else { continue };
         let Some(font) = rebuild(&data) else { continue };
         let Some(encoded) = deflate(&font) else { continue };
         let before = stream.content.len();

@@ -26,6 +26,9 @@ current state, verified results, design decisions and next steps. Then read `REA
 - **Never risk content.** When the engine does not fully understand an image or
   structure, it leaves it untouched. Every output is reloaded and its page count
   checked. A result that is not smaller is discarded.
+- **Every file is hostile.** Decode untrusted data only through `limits.rs` (never
+  `decompressed_content()` or unbounded loads), and add a case to `tests/hostile.rs` for
+  any new parsing path. See `docs/SECURITY.md`.
 - **Encrypted input is refused.** The check runs on the raw bytes as well as through
   lopdf's flags, because lopdf decrypts some files on load and silently fails on others.
   Saving them produced a near-empty PDF before the raw check existed.
