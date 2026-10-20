@@ -1,7 +1,7 @@
 # Handover
 
 Where PDF Epsilon stands, what has been verified, and what to do next.
-Last updated 19 October 2026, at version 0.3.1.
+Last updated 19 October 2026, at version 0.4.0.
 
 ## The brief
 
@@ -29,6 +29,7 @@ The code is public at https://github.com/yusungchang/pdf-epsilon, branch `main`.
 | Interface (`ui`) | Done. Checked in headless Chrome with a mocked bridge serving real analyses. Not yet clicked through in the real app window. |
 | Font optimizer (`fonts.rs`, `subset.rs`) | Done for TrueType CID fonts. Checked by text and pixel comparison in MuPDF and macOS. |
 | Hostile-input hardening (`limits.rs`) | Done. Bounded decoding everywhere; 20 hostile-file tests on all platforms. See `SECURITY.md`. |
+| Thumbnails, page comparison, progress | Done in 0.4.0. Pages render in an isolated, memory-capped process; saving writes the compared copy. Checked in headless Chrome with a mocked bridge serving real renders; not yet clicked through in the real app window. |
 | Languages (`ui/locales`) | English and Korean. Every string is in the locale files; tests check they match. |
 | CI and releases (`.github/workflows/build.yml`) | Builds installers for all three platforms on every push to `main` and on `v*` tags. First run started on 19 October 2026. |
 | Windows and Linux | Configured, never built or run. |
@@ -128,7 +129,7 @@ truncated PDF both give a clear "not a readable PDF" message.
 
 Every y increase gets a security review and a `vX.Y.0` tag; z versions are not tagged
 (see `CLAUDE.md`). The `v0.3.0` draft release predates the 0.3.1 hostile-input hardening,
-so the next tagged release, `v0.4.0`, is the first to include it.
+so `v0.4.0` is the first release to include it.
 
 ## Next steps
 

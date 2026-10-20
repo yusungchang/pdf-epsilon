@@ -19,3 +19,5 @@ tauri = { version = "2.12", features = [] }
 tauri-plugin-dialog = "2.8"
 tauri-plugin-opener = "2.7"
 serde = { version = "1", features = ["derive"] }
+# Page thumbnails. Runs only in a separate, memory-capped process (see src/render.rs).
+hayro = "0.8"

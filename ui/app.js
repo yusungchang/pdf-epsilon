@@ -1,13 +1,15 @@
 // PDF Epsilon interface. Plain script: Tauri's APIs come from window.__TAURI__.
 // Every word shown comes from ui/locales/<language>.json through t(); see "Languages" below.
-const { invoke } = window.__TAURI__.core;
+const { invoke, Channel } = window.__TAURI__.core;
 const { open, ask } = window.__TAURI__.dialog;
 const { revealItemInDir } = window.__TAURI__.opener;
 const { getCurrentWebview } = window.__TAURI__.webview;
 
 // To add a language, add ui/locales/<code>.json with the same keys as en.json and list it here,
 // under its own name for itself.
-const LANGUAGES = { en: "English", ko: "한국어" };
+// `short` labels the compact switcher: an uppercase code for Latin-script languages, the
+// native name for CJK languages, whose names are already short (日本語, 中文, 한국어).
+const LANGUAGES = { en: { name: "English", short: "EN" }, ko: { name: "한국어", short: "한국어" } };
 
 const PRESETS = ["lossless", "print", "balanced", "small"];
 // Page composition, in the order drawn: page field, colour class, label key.
@@ -19,6 +21,9 @@ const PARTS = [
   ["other", "annotations", "part.other"],
 ];
 const PAGE_BATCH = 60;
+// Thumbnails: pixel width rendered (sharp at 2x in the detail view), and pages per renderer run.
+const THUMB_WIDTH = 240;
+const THUMB_BATCH = 30;
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -33,9 +38,9 @@ const state = {
   options: null,        // what will actually be used
   custom: false,
   outputDir: null,      // null: next to the original
-  files: [],            // { path, status, analysis, error, saved }
+  files: [],            // { path, status, progress, analysis, error, saved, thumbs, removed }
   current: -1,
-  queue: [],
+  queue: [],            // files waiting for analysis
   busy: false,
   open: new Set(),      // expanded page numbers
   shown: PAGE_BATCH,
@@ -103,7 +108,11 @@ const say = (m) => t(m.key, m.args || {});
 
 function translateStatic() {
   document.querySelectorAll("[data-i18n]").forEach((e) => { e.textContent = t(e.dataset.i18n); });
-  document.querySelectorAll("[data-i18n-label]").forEach((e) => { e.setAttribute("aria-label", t(e.dataset.i18nLabel)); });
+  // Icon buttons carry their label as an accessible name and as a tooltip.
+  document.querySelectorAll("[data-i18n-label]").forEach((e) => {
+    e.setAttribute("aria-label", t(e.dataset.i18nLabel));
+    if (e.classList.contains("icon-btn")) e.dataset.tip = t(e.dataset.i18nLabel);
+  });
 }
 
 function errorText(e) {
@@ -196,9 +205,11 @@ function addFiles(paths) {
   for (const path of pdfs) {
     let i = state.files.findIndex((f) => f.path === path);
     if (i < 0) {
-      state.files.push({ path, status: "waiting", analysis: null, error: null, saved: null });
+      const f = { path, status: "waiting", progress: 0, analysis: null, error: null, saved: null,
+                  thumbs: new Map(), thumbsWanted: new Set(), removed: false };
+      state.files.push(f);
       i = state.files.length - 1;
-      state.queue.push(i);
+      state.queue.push(f);
     }
     if (state.current < 0 || pdfs.length === 1) select(i);
   }
@@ -210,22 +221,58 @@ async function pump() {
   if (state.busy) return;
   state.busy = true;
   while (state.queue.length) {
-    const i = state.queue.shift();
-    const f = state.files[i];
+    const f = state.queue.shift();
+    if (f.removed) continue;
     f.status = "analysing";
     renderFiles();
-    if (i === state.current) renderReport();
+    if (isCurrent(f)) renderReport();
+    const progress = new Channel();
+    progress.onmessage = (done) => { f.progress = done; showProgress(f); };
     try {
-      f.analysis = await invoke("analyze", { path: f.path });
+      f.analysis = await invoke("analyze", { path: f.path, progress });
       f.status = "ready";
     } catch (e) {
       f.error = e;
       f.status = "error";
     }
+    // A file removed while it was being analysed is simply forgotten.
+    if (f.removed) continue;
     renderFiles();
-    if (i === state.current) renderReport();
+    if (isCurrent(f)) renderReport();
   }
   state.busy = false;
+}
+
+const isCurrent = (f) => state.files[state.current] === f;
+
+// Updates the progress shown for a file without rebuilding the page.
+function showProgress(f) {
+  const chip = document.querySelector(`.file[data-index="${state.files.indexOf(f)}"] .file-sub`);
+  if (chip) chip.textContent = t("files.analysingPercent", { percent: formatPct(100 * f.progress) });
+  if (isCurrent(f)) {
+    const bar = document.querySelector("#status .progress span");
+    if (bar) bar.style.width = `${(100 * f.progress).toFixed(1)}%`;
+    const label = document.querySelector("#status .progress-label");
+    if (label) label.textContent = formatPct(100 * f.progress);
+  }
+}
+
+// Takes a file off the list. The file itself is not touched.
+function removeFile(f) {
+  const i = state.files.indexOf(f);
+  if (i < 0) return;
+  f.removed = true;
+  invoke("forget", { path: f.path }).catch(() => {});
+  state.files.splice(i, 1);
+  state.queue = state.queue.filter((q) => q !== f);
+  if (state.current > i) state.current -= 1;
+  else if (state.current === i) {
+    state.current = Math.min(i, state.files.length - 1);
+    state.open.clear();
+    state.shown = PAGE_BATCH;
+  }
+  renderFiles();
+  renderReport();
 }
 
 function select(i) {
@@ -242,13 +289,15 @@ function renderFiles() {
   nav.hidden = state.files.length === 0;
   $("drop").classList.toggle("compact", state.files.length > 0);
   nav.replaceChildren(...state.files.map((f, i) => {
-    const b = el("button", `file${i === state.current ? " on" : ""}`);
+    const chip = el("div", `file${i === state.current ? " on" : ""}`);
+    chip.dataset.index = i;
+    const b = el("button", "file-pick");
     b.type = "button";
     b.title = f.path;
     b.append(el("span", "file-name", basename(f.path)));
     let sub = "";
     if (f.status === "waiting") sub = t("files.waiting");
-    else if (f.status === "analysing") sub = t("files.analysing");
+    else if (f.status === "analysing") sub = t("files.analysingPercent", { percent: formatPct(100 * f.progress) });
     else if (f.status === "error") sub = t("files.cantRead");
     else {
       const best = Math.max(...f.analysis.presets.map((p) => f.analysis.file.bytes - p.outputBytes));
@@ -256,7 +305,13 @@ function renderFiles() {
     }
     b.append(el("span", `file-sub${f.status === "error" ? " error" : ""}`, sub));
     b.onclick = () => select(i);
-    return b;
+    const x = el("button", "file-remove", "×");
+    x.type = "button";
+    x.title = t("files.remove", { name: basename(f.path) });
+    x.setAttribute("aria-label", x.title);
+    x.onclick = () => removeFile(f);
+    chip.append(b, x);
+    return chip;
   }));
 }
 
@@ -273,7 +328,14 @@ function renderReport() {
       if (f.status === "error") {
         status.append(el("strong", "", basename(f.path)), el("br"), el("span", "error", errorText(f.error)));
       } else {
-        status.append(el("span", "spinner"), ` ${t("status.analysing", { name: basename(f.path) })}`);
+        const head = el("div", "status-head");
+        head.append(el("span", "spinner"), el("span", "", t("status.analysing", { name: basename(f.path) })),
+          el("span", "progress-label", formatPct(100 * f.progress)));
+        const bar = el("div", "progress");
+        const fill = el("span");
+        fill.style.width = `${(100 * f.progress).toFixed(1)}%`;
+        bar.append(fill);
+        status.append(head, bar);
       }
     }
     return;
@@ -477,14 +539,74 @@ function renderFindings(a) {
   }));
 }
 
+const pressed = (id) => $(id).getAttribute("aria-pressed") === "true";
+
 function jumpToPage(n) {
-  $("only-issues").checked = false;
-  $("largest").checked = false;
+  $("only-issues").setAttribute("aria-pressed", "false");
+  $("largest").setAttribute("aria-pressed", "false");
   state.open.add(n);
   const f = state.files[state.current];
   state.shown = Math.max(state.shown, n + 10);
   renderPages(f.analysis);
   document.querySelector(`[data-page="${n}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+// Thumbnails are rendered on demand, for rows that scroll into view, in a separate process.
+const thumbObserver = new IntersectionObserver((entries) => {
+  const f = state.files[state.current];
+  if (!f) return;
+  for (const e of entries) {
+    if (e.isIntersecting) wantThumb(f, Number(e.target.dataset.thumb));
+  }
+}, { rootMargin: "400px" });
+let thumbTimer = null;
+
+function wantThumb(f, page) {
+  if (f.thumbs.has(page) || f.thumbsWanted.has(page)) return;
+  f.thumbsWanted.add(page);
+  clearTimeout(thumbTimer);
+  thumbTimer = setTimeout(() => fetchThumbs(f), 120);
+}
+
+async function fetchThumbs(f) {
+  const pages = [...f.thumbsWanted].filter((p) => !f.thumbs.has(p)).slice(0, THUMB_BATCH);
+  if (!pages.length) return;
+  for (const p of pages) f.thumbs.set(p, undefined); // requested
+  const each = new Channel();
+  each.onmessage = ({ page, png }) => {
+    f.thumbs.set(page, png ? `data:image/png;base64,${png}` : null);
+    f.thumbsWanted.delete(page);
+    if (isCurrent(f)) document.querySelectorAll(`[data-thumb="${page}"]`).forEach((slot) => fillThumb(slot, f, page));
+  };
+  try {
+    await invoke("render", { path: f.path, options: null, pages, width: THUMB_WIDTH, each });
+  } catch { /* thumbnails are optional */ }
+  for (const p of pages) if (f.thumbs.get(p) === undefined) f.thumbs.set(p, null);
+  if (f.thumbsWanted.size) fetchThumbs(f);
+}
+
+function fillThumb(slot, f, page) {
+  const src = f.thumbs.get(page);
+  slot.classList.toggle("none", src === null);
+  if (src && !slot.querySelector("img")) {
+    const img = el("img");
+    img.src = src;
+    img.alt = "";
+    slot.append(img);
+  }
+}
+
+function thumbSlot(f, page, cls) {
+  // Clicking a thumbnail compares that page, whether or not anything on it changes.
+  const slot = el("button", cls);
+  slot.type = "button";
+  slot.title = t("compare.pageButton");
+  slot.setAttribute("aria-label", t("compare.pageButton"));
+  slot.onclick = (e) => { e.stopPropagation(); if (f.status === "ready") openCompare(f, page); };
+  slot.dataset.thumb = page;
+  fillThumb(slot, f, page);
+  if (!f.thumbs.has(page)) thumbObserver.observe(slot);
+  return slot;
 }
 
 function renderPages(a) {
@@ -497,13 +619,14 @@ function renderPages(a) {
 
   const i = presetIndex();
   let pages = a.pages;
-  if ($("only-issues").checked) pages = pages.filter((p) => p.issues.length);
-  if ($("largest").checked) pages = [...pages].sort((x, y) => y.bytes - x.bytes);
+  if (pressed("only-issues")) pages = pages.filter((p) => p.issues.length);
+  if (pressed("largest")) pages = [...pages].sort((x, y) => y.bytes - x.bytes);
   const max = Math.max(1, ...a.pages.map((p) => p.bytes));
   const images = new Map(a.images.map((im) => [im.obj, im]));
   const fonts = new Map(a.fonts.map((ft) => [ft.obj, ft]));
 
   const box = $("pages");
+  thumbObserver.disconnect();
   const shown = pages.slice(0, state.shown);
   box.replaceChildren(...shown.map((p) => pageRow(p, max, i, images, fonts)));
   if (!pages.length) box.append(el("p", "empty", t("pages.empty")));
@@ -516,9 +639,12 @@ function renderPages(a) {
 function pageRow(p, max, i, images, fonts) {
   const wrap = el("div", "page");
   wrap.dataset.page = p.number;
-  const row = el("button", "page-row");
-  row.type = "button";
+  // A div acting as a button, since it holds the thumbnail's own button.
+  const row = el("div", "page-row");
+  row.setAttribute("role", "button");
+  row.tabIndex = 0;
   row.setAttribute("aria-expanded", String(state.open.has(p.number)));
+  row.onkeydown = (e) => { if ((e.key === "Enter" || e.key === " ") && e.target === row) { e.preventDefault(); row.onclick(); } };
   const bar = el("span", "p-bar");
   for (const [key, cls, label] of PARTS) {
     if (!p[key]) continue;
@@ -528,8 +654,10 @@ function pageRow(p, max, i, images, fonts) {
     bar.append(s);
   }
   const saving = state.custom ? 0 : p.savings[i];
+  const f = state.files[state.current];
   row.append(
     el("span", "p-no", String(p.number)),
+    thumbSlot(f, p.number, "p-thumb"),
     bar,
     el("span", "p-bytes", formatBytes(p.bytes)),
     el("span", `p-saving${saving > 0 ? " good" : ""}`, saving > 0 ? formatBytes(-saving) : "–"),
@@ -547,9 +675,20 @@ function pageRow(p, max, i, images, fonts) {
 
 function pageDetail(p, i, images, fonts) {
   const d = el("div", "page-detail");
+  const f = state.files[state.current];
+  // The page's thumbnail beside its facts and issues; images and fonts below.
+  const top = el("div", "pd-top");
+  const info = el("div", "pd-info");
+  top.append(thumbSlot(f, p.number, "pd-thumb"), info);
+  d.append(top);
   const size = t("page.size", { width: Math.round(p.width / 72 * 25.4), height: Math.round(p.height / 72 * 25.4) });
   const parts = PARTS.filter(([k]) => p[k]).map(([k, , label]) => t("page.part", { part: t(label), size: { bytes: p[k] } }));
-  d.append(el("p", "pd-facts", `${size} · ${parts.join(" · ") || t("page.empty")}`));
+  const facts = el("p", "pd-facts", `${size} · ${parts.join(" · ") || t("page.empty")}`);
+  const cmpPage = el("button", "compare-btn");
+  cmpPage.type = "button";
+  cmpPage.append(icon("compare"), el("span", "", t("compare.pageButton")));
+  cmpPage.onclick = () => openCompare(f, p.number);
+  info.append(facts, cmpPage);
 
   if (p.issues.length) {
     const ul = el("ul", "pd-issues");
@@ -558,7 +697,7 @@ function pageDetail(p, i, images, fonts) {
       li.append(el("span", "pd-dot"), el("span", "", say(x.message)));
       ul.append(li);
     }
-    d.append(ul);
+    info.append(ul);
   }
 
   const imgs = p.imageObjs.map((o) => images.get(o)).filter((im) => im && !im.isMask);
@@ -582,12 +721,13 @@ function pageDetail(p, i, images, fonts) {
       if (im.visible !== null && im.visible < 0.995) shown.push(t("image.visible", { percent: Math.round(im.visible * 100) }));
       if (im.pages.length > 1) shown.push(t("image.onPages", { count: im.pages.length }));
       const label = { width: im.width, height: im.height, colour: { term: `colour.${im.colour}` } };
+      const afterCell = el("td", r && !state.custom ? "good" : "muted", after);
       tr.append(
         el("td", "", t(im.hasSoftMask ? "image.labelMask" : "image.label", label)),
         el("td", "", im.encoding.replace(/Decode/g, "")),
         el("td", "num", formatBytes(im.bytes)),
         el("td", "", shown.join(", ")),
-        el("td", r && !state.custom ? "good" : "muted", after),
+        afterCell,
       );
       tbl.append(tr);
     }
@@ -602,27 +742,465 @@ function pageDetail(p, i, images, fonts) {
   return d;
 }
 
+// ---- compare: a page as it is, and as the current settings will save it ----
+//
+// The smaller copy is made once with the current settings and kept by the app, so saving
+// afterwards writes exactly what was compared. Both versions are drawn by the isolated
+// renderer at the size needed, and cached per file.
+
+const ZOOMS = [1, 2, 4];
+
+function settingsLabel() {
+  return state.custom ? t("compare.custom") : presetName(state.preset);
+}
+
+function renderPage(f, compressed, page, width) {
+  const key = `${compressed ? JSON.stringify(state.options) : "original"}|${page}|${width}`;
+  f.renders = f.renders || new Map();
+  if (!f.renders.has(key)) {
+    f.renders.set(key, new Promise((resolve) => {
+      const each = new Channel();
+      each.onmessage = ({ png }) => resolve(png ? `data:image/png;base64,${png}` : null);
+      invoke("render", { path: f.path, options: compressed ? state.options : null, pages: [page], width, each })
+        .catch(() => resolve(null));
+    }));
+  }
+  return f.renders.get(key);
+}
+
+async function openCompare(f, page) {
+  const dlg = $("compare");
+  const view = { page, zoom: 1, mode: "swipe", split: 50, diff: false, drawnFor: 0, aspect: 0 };
+  const head = el("div", "cmp-head");
+  const title = el("h3");
+  const nav = el("div", "cmp-nav");
+  const prev = el("button", "cmp-step", "‹");
+  const next = el("button", "cmp-step", "›");
+  for (const [b, key, d] of [[prev, "compare.prev", -1], [next, "compare.next", 1]]) {
+    b.type = "button";
+    b.setAttribute("aria-label", t(key));
+    b.title = t(key);
+    b.onclick = () => { view.page += d; draw(); };
+  }
+  const close = el("button", "cmp-close", "×");
+  close.type = "button";
+  close.setAttribute("aria-label", t("compare.close"));
+  close.onclick = () => dlg.close();
+  close.autofocus = true;
+  dlg.onclose = () => {
+    resizeWatch.disconnect();
+    document.documentElement.classList.remove("modal-open");
+  };
+  nav.append(prev, next, close);
+  head.append(title, nav);
+  const body = el("div", "cmp-body");
+  dlg.replaceChildren(head, body);
+  if (!dlg.open) dlg.showModal();
+  // The page behind does not scroll (or show its scroll bar) while the window is open.
+  document.documentElement.classList.add("modal-open");
+
+  // Make (or reuse) the smaller copy with the current settings.
+  title.textContent = t("compare.preparing");
+  const bar = el("div", "progress");
+  const fill = el("span");
+  bar.append(fill);
+  body.replaceChildren(bar);
+  const progress = new Channel();
+  progress.onmessage = (done) => { fill.style.width = `${(100 * done).toFixed(1)}%`; };
+  let report;
+  try {
+    report = await invoke("prepare", { path: f.path, options: state.options, progress });
+  } catch (e) {
+    body.replaceChildren(el("p", "error", errorText(e)));
+    return;
+  }
+  if (!dlg.open) return;
+
+  const a = f.analysis;
+  const total = a.pages.length;
+  const toolbar = el("div", "cmp-tools");
+  const scroller = el("div", "cmp-stage");
+  const captions = el("div", "cmp-captions");
+  const note = el("p", "hint");
+  body.replaceChildren(toolbar, scroller, captions, note);
+
+  const segmented = (items, current, set) => {
+    const g = el("div", "segmented");
+    for (const [value, label] of items) {
+      const b = el("button", value === current ? "on" : "", label);
+      b.type = "button";
+      b.onclick = () => { set(value); draw(); };
+      g.append(b);
+    }
+    return g;
+  };
+
+  async function draw() {
+    const p = a.pages[view.page - 1];
+    title.textContent = t("compare.pageTitle", { page: view.page, total, settings: settingsLabel() });
+    prev.disabled = view.page <= 1;
+    next.disabled = view.page >= total;
+
+    const diffToggle = el("label", "cmp-check");
+    const box = el("input");
+    box.type = "checkbox";
+    box.checked = view.diff;
+    box.onchange = () => { view.diff = box.checked; draw(); };
+    diffToggle.append(box, ` ${t("compare.diff")}`);
+    toolbar.replaceChildren(
+      segmented([["swipe", t("compare.swipe")], ["side", t("compare.side")]], view.mode, (v) => { view.mode = v; }),
+      // A new magnification centres the view and puts the divider in the middle of the screen.
+      segmented(ZOOMS.map((z) => [z, z === 1 ? t("compare.zoomFit") : `${z}×`]), view.zoom, (v) => {
+        view.zoom = v;
+        view.split = 50;
+        view.recentre = true;
+      }),
+      diffToggle,
+    );
+
+    const lean = report.keptOriginal;
+    const pageSaving = state.custom ? 0 : p.savings[presetIndex()];
+    captions.replaceChildren(
+      el("span", "", lean ? t("compare.lean") : t("compare.summaryFile", { settings: settingsLabel(), before: { bytes: report.inputBytes }, after: { bytes: report.outputBytes } })),
+      el("span", "good", pageSaving > 0 ? t("compare.summaryPage", { size: { bytes: pageSaving } }) : ""),
+    );
+    note.textContent = view.diff ? "" : t("compare.hint");
+
+    const waiting = el("p", "cmp-loading");
+    waiting.append(el("span", "spinner"), ` ${t("compare.rendering")}`);
+    scroller.replaceChildren(waiting);
+    scroller.className = `cmp-stage ${view.diff ? "diff" : view.mode}`;
+    view.recentreDivider = null;
+    scroller.style.setProperty("--zoom", view.zoom);
+    // Render at the size the page will be shown, so it is sharp but no larger than needed.
+    view.aspect = view.aspect || (p.width > 0 && p.height > 0 ? p.width / p.height : 0.75);
+    view.drawnFor = fitWidth();
+    const width = Math.min(4096, Math.round(view.drawnFor * (window.devicePixelRatio || 1) * view.zoom));
+    const shownPage = view.page;
+    const [before, after] = await Promise.all([renderPage(f, false, shownPage, width), renderPage(f, true, shownPage, width)]);
+    if (!dlg.open || view.page !== shownPage) return;
+    if (!before || !after) {
+      scroller.replaceChildren(el("p", "error", t("compare.renderFailed")));
+      return;
+    }
+
+    const image = (src, cls, alt) => {
+      const i = el("img", cls);
+      i.src = src;
+      i.alt = alt;
+      // The rendered page's own proportions win over the page box (rotated pages, for one).
+      i.onload = () => {
+        const aspect = i.naturalWidth / i.naturalHeight;
+        if (cls === "cmp-base" && aspect > 0 && Math.abs(aspect - view.aspect) > 0.01) { view.aspect = aspect; layout(); }
+      };
+      return i;
+    };
+    const frame = () => el("div", "cmp-frame");
+
+    if (view.diff) {
+      const fr = frame();
+      const base = image(before, "cmp-base", t("compare.original"));
+      fr.prepend(base);
+      scroller.replaceChildren(fr);
+      const result = await differences(before, after);
+      if (!dlg.open || view.page !== shownPage || !view.diff) return;
+      if (result.blank) {
+        note.textContent = t("compare.diffFailed");
+        return;
+      }
+      const overlay = el("canvas", "cmp-overlay");
+      overlay.width = result.maskWidth;
+      overlay.height = result.maskHeight;
+      overlay.getContext("2d").putImageData(result.mask, 0, 0);
+      fr.insertBefore(overlay, fr.children[1] || null);
+      // Measured on the render at this zoom: zooming in shows finer detail, and finer differences.
+      const share = (100 * result.changed) / (result.width * result.height);
+      note.textContent = result.changed === 0
+        ? t("compare.diffNone")
+        : t("compare.diffSome", { percent: share < 0.1 ? t("compare.under", { percent: formatPct(0.1) }) : formatPct(share) });
+    } else if (view.mode === "swipe") {
+      const fr = frame();
+      const top = image(after, "cmp-after", settingsLabel());
+      top.style.clipPath = `inset(0 0 0 ${view.split}%)`;
+      const line = el("div", "cmp-line");
+      line.style.left = `${view.split}%`;
+      const slider = el("input", "cmp-slider");
+      Object.assign(slider, { type: "range", min: 0, max: 100, value: view.split });
+      slider.setAttribute("aria-label", t("compare.hint"));
+      const setSplit = (v) => {
+        view.split = Math.max(0, Math.min(100, v));
+        top.style.clipPath = `inset(0 0 0 ${view.split}%)`;
+        line.style.left = `${view.split}%`;
+        slider.value = view.split;
+      };
+      slider.oninput = () => setSplit(Number(slider.value));
+      view.recentreDivider = () => {
+        // When scrolling takes the divider out of sight, bring it to the middle of the view.
+        const left = fr.offsetLeft + (fr.clientWidth * view.split) / 100;
+        const margin = scroller.clientWidth * 0.02;
+        if (left < scroller.scrollLeft + margin || left > scroller.scrollLeft + scroller.clientWidth - margin) {
+          setSplit((100 * (scroller.scrollLeft + scroller.clientWidth / 2 - fr.offsetLeft)) / fr.clientWidth);
+        }
+      };
+      fr.prepend(image(before, "cmp-base", t("compare.original")), top);
+      fr.append(line, slider);
+      // Which side is which, pinned to the visible corners while zoomed and scrolled.
+      const tags = el("div", "cmp-tags");
+      tags.append(el("span", "cmp-tag", t("compare.original")), el("span", "cmp-tag", settingsLabel()));
+      scroller.replaceChildren(tags, fr);
+    } else {
+      const side = (src, label) => {
+        const fig = el("figure");
+        const fr = frame();
+        fr.prepend(image(src, "cmp-base", label));
+        fig.append(fr, el("figcaption", "", label));
+        return fig;
+      };
+      scroller.replaceChildren(side(before, t("compare.original")), side(after, settingsLabel()));
+    }
+    layout();
+    if (view.recentre) {
+      view.recentre = false;
+      requestAnimationFrame(() => {
+        scroller.scrollLeft = (scroller.scrollWidth - scroller.clientWidth) / 2;
+        scroller.scrollTop = (scroller.scrollHeight - scroller.clientHeight) / 2;
+      });
+    }
+  }
+
+  // "Fit" shows the whole page in the space available; 2× and 4× scale from there.
+  function columns() {
+    return view.mode === "side" && !view.diff ? 2 : 1;
+  }
+  function fitWidth() {
+    const cols = columns();
+    const pad = 16;
+    const availW = ((scroller.clientWidth || 1000) - pad - (cols - 1) * 8) / cols;
+    const availH = (scroller.clientHeight || 600) - pad - (cols === 2 ? 24 : 0);
+    return Math.max(80, Math.min(availW, availH * (view.aspect || 0.75)));
+  }
+  function layout() {
+    const w = `${Math.round(fitWidth() * view.zoom)}px`;
+    scroller.querySelectorAll(".cmp-frame").forEach((fr) => {
+      fr.style.width = w;
+      if (fr.parentElement.tagName === "FIGURE") fr.parentElement.style.width = w;
+    });
+  }
+
+  // The window can be resized. The page is laid out again at once; when it grows by more than
+  // a quarter, it is also drawn again at the new size so it stays sharp.
+  let resizeTimer = null;
+  let scrollFrame = 0;
+  scroller.addEventListener("scroll", () => {
+    cancelAnimationFrame(scrollFrame);
+    scrollFrame = requestAnimationFrame(() => view.recentreDivider?.());
+  }, { passive: true });
+
+  const resizeWatch = new ResizeObserver(() => {
+    layout();
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (dlg.open && view.drawnFor && fitWidth() > view.drawnFor * 1.25) draw();
+    }, 250);
+  });
+  resizeWatch.observe(scroller);
+  draw();
+}
+
+// Marks pixels that differ visibly between two renders of the same page. Works through the
+// page in strips with two small canvases, freed at the end, and returns a mask at most 2048
+// pixels across: WebKit caps the memory all canvases may use together, and page-sized canvases
+// at 4× ran into it and came back blank. A blank render is reported, never compared.
+const DIFF_VISIBLE = 32; // of 255, in any channel; less is rounding and resampling noise
+async function differences(beforeSrc, afterSrc) {
+  const load = (src) => new Promise((resolve, reject) => { const i = new Image(); i.onload = () => resolve(i); i.onerror = reject; i.src = src; });
+  const [b, a] = await Promise.all([load(beforeSrc), load(afterSrc)]);
+  const width = Math.min(b.naturalWidth, a.naturalWidth);
+  const height = Math.min(b.naturalHeight, a.naturalHeight);
+  const scale = Math.max(1, Math.ceil(Math.max(width, height) / 2048));
+  const maskWidth = Math.ceil(width / scale);
+  const maskHeight = Math.ceil(height / scale);
+  const mask = new ImageData(maskWidth, maskHeight);
+  const rows = Math.max(scale, Math.floor(1_000_000 / width / scale) * scale);
+  const canvas = () => {
+    const c = document.createElement("canvas");
+    c.width = width;
+    c.height = rows;
+    return [c, c.getContext("2d", { willReadFrequently: true })];
+  };
+  const [cb, xb] = canvas();
+  const [ca, xa] = canvas();
+  let changed = 0;
+  let blank = false;
+  try {
+    for (let y0 = 0; y0 < height; y0 += rows) {
+      const h = Math.min(rows, height - y0);
+      xb.clearRect(0, 0, width, rows);
+      xa.clearRect(0, 0, width, rows);
+      xb.drawImage(b, 0, y0, width, h, 0, 0, width, h);
+      xa.drawImage(a, 0, y0, width, h, 0, 0, width, h);
+      const pb = xb.getImageData(0, 0, width, h).data;
+      const pa = xa.getImageData(0, 0, width, h).data;
+      // Pages are drawn on opaque white, so a transparent pixel means the canvas failed.
+      if (pb[3] === 0 || pa[3] === 0) { blank = true; break; }
+      for (let y = 0; y < h; y++) {
+        const m = Math.floor((y0 + y) / scale) * maskWidth;
+        for (let x = 0; x < width; x++) {
+          const i = (y * width + x) * 4;
+          const d = Math.max(Math.abs(pb[i] - pa[i]), Math.abs(pb[i + 1] - pa[i + 1]), Math.abs(pb[i + 2] - pa[i + 2]));
+          if (d < DIFF_VISIBLE) continue;
+          changed++;
+          // Stronger differences are marked more strongly.
+          const j = (m + Math.floor(x / scale)) * 4;
+          const alpha = Math.min(230, 70 + (d - DIFF_VISIBLE) * 2);
+          if (alpha > mask.data[j + 3]) {
+            mask.data[j] = 230; mask.data[j + 1] = 40; mask.data[j + 2] = 90; mask.data[j + 3] = alpha;
+          }
+        }
+      }
+    }
+  } finally {
+    for (const c of [cb, ca]) { c.width = 0; c.height = 0; }
+  }
+  return { width, height, mask, maskWidth, maskHeight, changed, blank };
+}
+
 // ---- wiring ----
 
+// A compact language switcher: a globe and a short label, with the full names in its menu.
 function renderLanguagePicker() {
-  const pick = $("language");
-  pick.replaceChildren(...Object.entries(LANGUAGES).map(([code, name]) => {
-    const o = el("option", "", name);
-    o.value = code;
-    return o;
+  const button = $("language");
+  const menu = $("language-menu");
+  const label = () => {
+    button.replaceChildren(globe(), el("span", "", LANGUAGES[i18n.lang].short));
+    button.setAttribute("aria-label", `${t("language.label")}: ${LANGUAGES[i18n.lang].name}`);
+    button.title = LANGUAGES[i18n.lang].name;
+  };
+  const items = () => menu.replaceChildren(...Object.entries(LANGUAGES).map(([code, l]) => {
+    const item = el("button", code === i18n.lang ? "on" : "", l.name);
+    item.type = "button";
+    item.setAttribute("role", "menuitemradio");
+    item.setAttribute("aria-checked", String(code === i18n.lang));
+    item.lang = code;
+    item.onclick = async () => {
+      closeMenus();
+      await setLanguage(code);
+      save("language", code);
+      label();
+      renderThemePicker.relabel?.();
+      renderSettings();
+      renderFiles();
+      renderReport();
+    };
+    return item;
   }));
-  pick.value = i18n.lang;
-  pick.addEventListener("change", async () => {
-    await setLanguage(pick.value);
-    save("language", pick.value);
-    renderSettings();
-    renderFiles();
-    renderReport();
-  });
+  label();
+  button.onclick = (e) => {
+    e.stopPropagation();
+    const opening = menu.hidden;
+    closeMenus();
+    if (opening) {
+      items();
+      menu.hidden = false;
+      button.setAttribute("aria-expanded", "true");
+    }
+  };
+  document.addEventListener("click", closeMenus);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenus(); });
 }
+
+// Line icons on a 16 × 16 grid, drawn with the current text colour.
+const ICONS = {
+  globe: ["M8 1.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 1 0 0-13", "M1.5 8h13", "M8 1.5c2 2 2.6 4.2 2.6 6.5S10 12.5 8 14.5C6 12.5 5.4 10.3 5.4 8S6 3.5 8 1.5"],
+  issues: ["M8 2L14.5 13.5H1.5Z", "M8 6.5v3.2", "M8 11.6v.1"],
+  largest: ["M2.5 4h11", "M2.5 8h7.5", "M2.5 12h4"],
+  expand: ["M4.5 6.5L8 3l3.5 3.5", "M4.5 9.5L8 13l3.5-3.5"],
+  collapse: ["M4.5 2.5L8 6l3.5-3.5", "M4.5 13.5L8 10l3.5 3.5"],
+  compare: ["M2 3.5h12v9H2z", "M8 2v12", "M4 6.5h2", "M10 9.5h2"],
+  system: ["M2 3h12v8H2z", "M6 14h4", "M8 11v3"],
+  light: ["M8 5.2a2.8 2.8 0 1 0 0 5.6a2.8 2.8 0 1 0 0-5.6", "M8 1.5v1.5", "M8 13v1.5", "M1.5 8H3", "M13 8h1.5", "M3.4 3.4l1 1", "M11.6 11.6l1 1", "M3.4 12.6l1-1", "M11.6 4.4l1-1"],
+  dark: ["M13 9.5A5.5 5.5 0 1 1 6.5 3a4.5 4.5 0 0 0 6.5 6.5Z"],
+};
+
+// ---- theme: System (the default) follows the operating system; Light and Dark override it ----
+
+const THEMES = ["system", "light", "dark"];
+
+function applyTheme(theme) {
+  if (theme === "system") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = theme;
+  // The window frame (title bar) follows too, where the platform allows it.
+  try {
+    window.__TAURI__.window?.getCurrentWindow().setTheme(theme === "system" ? null : theme).catch(() => {});
+  } catch { /* not available */ }
+}
+
+function closeMenus() {
+  for (const [b, m] of [["theme", "theme-menu"], ["language", "language-menu"]]) {
+    $(m).hidden = true;
+    $(b).setAttribute("aria-expanded", "false");
+  }
+}
+
+function renderThemePicker() {
+  const button = $("theme");
+  const menu = $("theme-menu");
+  let current = THEMES.includes(load("theme", "system")) ? load("theme", "system") : "system";
+  const label = () => {
+    button.replaceChildren(icon(current));
+    button.setAttribute("aria-label", `${t("theme.label")}: ${t(`theme.${current}`)}`);
+    button.title = `${t("theme.label")}: ${t(`theme.${current}`)}`;
+  };
+  const items = () => menu.replaceChildren(...THEMES.map((theme) => {
+    const item = el("button", theme === current ? "on" : "");
+    item.type = "button";
+    item.setAttribute("role", "menuitemradio");
+    item.setAttribute("aria-checked", String(theme === current));
+    item.append(icon(theme), el("span", "", t(`theme.${theme}`)));
+    item.onclick = () => {
+      current = theme;
+      save("theme", theme);
+      applyTheme(theme);
+      closeMenus();
+      label();
+    };
+    return item;
+  }));
+  applyTheme(current);
+  label();
+  button.onclick = (e) => {
+    e.stopPropagation();
+    const opening = menu.hidden;
+    closeMenus();
+    if (opening) {
+      items();
+      menu.hidden = false;
+      button.setAttribute("aria-expanded", "true");
+    }
+  };
+  // Relabelled when the language changes.
+  renderThemePicker.relabel = label;
+}
+
+function icon(name, cls = "icon") {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 16 16");
+  svg.setAttribute("aria-hidden", "true");
+  svg.classList.add(cls);
+  for (const d of ICONS[name]) {
+    const path = document.createElementNS(ns, "path");
+    path.setAttribute("d", d);
+    svg.append(path);
+  }
+  return svg;
+}
+
+const globe = () => icon("globe", "globe");
 
 async function init() {
   await setLanguage(pickLanguage());
+  renderThemePicker();
   renderLanguagePicker();
   for (const p of await invoke("presets")) state.presets[p.id] = p.options;
 
@@ -646,10 +1224,22 @@ async function init() {
     if (dir) { state.outputDir = dir; renderSettings(); persist(); }
   });
   $("save").addEventListener("click", saveCopy);
+  document.querySelectorAll("[data-icon]").forEach((b) => b.prepend(icon(b.dataset.icon)));
   for (const id of ["only-issues", "largest"]) {
-    $(id).addEventListener("input", () => { state.shown = PAGE_BATCH; renderPages(state.files[state.current].analysis); });
+    $(id).addEventListener("click", () => {
+      $(id).setAttribute("aria-pressed", String(!pressed(id)));
+      state.shown = PAGE_BATCH;
+      renderPages(state.files[state.current].analysis);
+    });
   }
   $("more-pages").addEventListener("click", () => { state.shown += PAGE_BATCH; renderPages(state.files[state.current].analysis); });
+  $("expand-all").addEventListener("click", () => {
+    const a = state.files[state.current].analysis;
+    const pages = pressed("only-issues") ? a.pages.filter((p) => p.issues.length) : a.pages;
+    for (const p of pages) state.open.add(p.number);
+    renderPages(a);
+  });
+  $("collapse-all").addEventListener("click", () => { state.open.clear(); renderPages(state.files[state.current].analysis); });
 
   $("drop").addEventListener("click", async () => {
     const files = await open({ multiple: true, title: t("dialog.choose"), filters: [{ name: t("dialog.pdf"), extensions: ["pdf", "PDF"] }] });

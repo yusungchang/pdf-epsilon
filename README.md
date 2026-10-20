@@ -17,8 +17,15 @@ Before anything is changed, PDF Epsilon shows:
 - **What was found:** oversized images, images mostly outside the page, fonts embedded in
   full or more than once, duplicates, thumbnails, editor data, incremental saves, and images
   it cannot handle yet. Each finding says whether a preset fixes it, and by how much.
-- **Page by page:** each page's share of the file, what it is made of, its issues, and every
-  image on it with its resolution as drawn and what the chosen preset makes of it.
+- **Page by page:** a thumbnail of each page, its share of the file, what it is made of, its
+  issues, and every image on it with its resolution as drawn and what the chosen preset makes
+  of it.
+- **Compare** shows a page as it is and as the current settings will save it: a divider to drag
+  across, side by side, or with every visibly changed pixel marked, at Fit, 2× or 4×, in a window
+  you can resize. Saving afterwards writes exactly the version compared.
+- **Light, dark or system theme**, and English or Korean, from the two buttons at the top.
+- **Progress** while a file is analysed. Several files can be dropped at once; × takes one off
+  the list without touching the file.
 - **Warnings** for signed documents and PDF/A files.
 
 See [docs/ANALYZER.md](docs/ANALYZER.md) for how it works.

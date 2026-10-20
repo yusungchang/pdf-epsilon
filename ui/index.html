@@ -17,10 +17,16 @@
         <p class="tagline" data-i18n="app.tagline"></p>
       </div>
     </div>
-    <label class="language">
-      <span class="visually-hidden" data-i18n="language.label"></span>
-      <select id="language"></select>
-    </label>
+    <div class="header-tools">
+      <div class="theme">
+        <button id="theme" class="theme-button" type="button" aria-haspopup="menu" aria-expanded="false"></button>
+        <div id="theme-menu" class="theme-menu" role="menu" hidden></div>
+      </div>
+      <div class="language">
+        <button id="language" class="language-button" type="button" aria-haspopup="menu" aria-expanded="false"></button>
+        <div id="language-menu" class="language-menu" role="menu" hidden></div>
+      </div>
+    </div>
   </header>
 
   <main>
@@ -105,8 +111,11 @@
         <div class="pages-head">
           <h3 data-i18n="pages.title"></h3>
           <div class="pages-tools">
-            <label><input type="checkbox" id="only-issues"> <span data-i18n="pages.onlyIssues"></span></label>
-            <label><input type="checkbox" id="largest"> <span data-i18n="pages.largest"></span></label>
+            <button id="only-issues" class="icon-btn" type="button" aria-pressed="false" data-icon="issues" data-i18n-label="pages.onlyIssues"></button>
+            <button id="largest" class="icon-btn" type="button" aria-pressed="false" data-icon="largest" data-i18n-label="pages.largest"></button>
+            <span class="tool-sep" aria-hidden="true"></span>
+            <button id="expand-all" class="icon-btn" type="button" data-icon="expand" data-i18n-label="pages.expandAll"></button>
+            <button id="collapse-all" class="icon-btn" type="button" data-icon="collapse" data-i18n-label="pages.collapseAll"></button>
           </div>
         </div>
         <div class="page-legend" id="page-legend"></div>
@@ -115,6 +124,8 @@
       </section>
     </div>
   </main>
+
+  <dialog id="compare" class="compare"></dialog>
 
   <script src="app.js"></script>
 </body>

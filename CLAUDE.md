@@ -11,7 +11,10 @@ current state, verified results, design decisions and next steps. Then read `REA
   `subset.rs` subsets fully embedded TrueType CID fonts, `fonts.rs` drops font tables
   no viewer reads, `images.rs` recompresses,
   `dedup.rs` merges identical streams, and `clean.rs` strips optional data.
-- `src-tauri` is the shell with commands `presets`, `file_size`, `analyze` and `compress`.
+- `src-tauri` is the shell with commands `presets`, `file_size`, `analyze` (with progress),
+  `prepare` (the compressed copy for comparison, kept so saving writes exactly it), `render`,
+  `forget` and `compress`. `render.rs` draws pages with hayro in a separate, memory-capped copy of
+  the app (`--render-thumbnails`); never render in-process.
   Output files are written with `create_new` and are never overwritten.
 - `ui` is plain JS with no bundler. Tauri APIs come from `window.__TAURI__`
   (`withGlobalTauri`).

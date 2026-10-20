@@ -8,8 +8,8 @@ macOS, Windows and Linux.
 
 - **Run it.** There is no JavaScript engine, and actions, launch commands, links and form
   scripts are never followed. They are only carried over into the smaller copy.
-- **Render it.** The window shows the analysis, not the document, so viewer exploits that
-  target rendering do not apply.
+- **Render it in the app.** Page thumbnails are drawn by a separate copy of the app started
+  just for that (see below). The window itself never parses or renders the document.
 - **Extract it.** Attachments and embedded files are never written to disk.
 - **Fetch anything.** Nothing goes over the network; the app has no network permission.
 
@@ -29,6 +29,7 @@ macOS, Windows and Linux.
 | Files with millions of tiny objects | The object count is estimated from the raw bytes before loading; files estimated at over 1 million are refused. Documents with over 100,000 objects are analysed one preset at a time. |
 | Slow algorithms on large documents | Pruning and renumbering are linear. lopdf's own versions are quadratic: they took 103 s on 500,000 objects, against 2 s now. |
 | Panics | Each preset runs on its own thread, and the app runs work off the main thread, so a panic becomes an error message, not a crash. |
+| Rendering (thumbnails and page comparison) | The renderer (hayro, pure Rust, no `unsafe`) has no limits of its own: in testing, one hostile file made it take 10.9 GB and run past 60 s. So it runs in a separate process, started from the app's own executable with `--render-thumbnails`. That process caps its own heap at 1 GB with a counting allocator, on every platform alike, and the app kills it if a page takes over 8 seconds or a batch over 60. Compressed copies for comparison reach it through a pipe and are never written to disk. A hostile file costs missing pictures, never the app. Measured: the worst attacks now end in under a second at 11–796 MB. |
 | Text from the file in the interface (font names, producer, attachment names) | Always inserted as text (`textContent`), never as HTML. The Content Security Policy allows only the app's own scripts. |
 | Overwriting files | Output is created with `create_new` as `<name>-epsilon.pdf`. An existing file or symlink is never replaced. |
 | Encrypted files decrypted silently | Refused, by a raw-byte check as well as lopdf's flags. |

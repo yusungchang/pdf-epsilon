@@ -8,6 +8,68 @@
 | 0.2.0 | 2026-10-19 | Analyzer: byte breakdown, measured preset savings, findings and page-by-page report. Installers for all platforms. English and Korean. |
 | 0.3.0 | 2026-10-19 | Font optimizer: unused font tables dropped, fully embedded TrueType CID fonts subset. Research on further optimizations. |
 | 0.3.1 | 2026-10-19 | Security hardening against hostile PDFs: bounded decoding everywhere, file size cap, hostile-file tests on all platforms. |
+| 0.4.0 | 2026-10-21 | Analysis progress, page thumbnails and before-and-after page comparison in an isolated renderer, removing files from the list, compact language button, theme button, icon tools for the page list. |
+
+## 0.4.0, 21 October 2026
+
+The owner asked for four features, after an estimate of what each costs.
+
+1. **Progress.** The engine reports progress (pages inspected, then each preset's images) through a callback;
+   the analysis weighs inspection at 12% and each preset at 22%. The app forwards it over a Tauri channel,
+   throttled, and the file chip and status card show a bar and a percentage.
+2. **Thumbnails.** PDFs rarely carry their own (`/Thumb`; none of the eight test files has one), so pages are
+   rendered with hayro 0.8 (MIT/Apache, pure Rust, no `unsafe`). It drew every test page correctly in 0–50 ms.
+   Its security review found that it has no limits: on the hostile corpus it reached 2–4.5 GB, and an image
+   claiming 2 billion × 2 billion pixels took it past 60 s at 10.9 GB. So it never runs in the app. The app
+   starts its own executable with `--render-thumbnails`, which caps its heap at 1 GB with a counting global
+   allocator (the same on every platform) and is killed after 8 s per page or 60 s per batch. Under attack
+   it now stops in under a second at 11–796 MB. Rows request thumbnails as they scroll into view, 30 pages
+   per renderer run; the page detail shows a larger one.
+3. **Comparison, first per image, then per page.** A per-image comparison was built first (each image as
+   stored and as the preset stores it). The owner then proposed comparing pages instead: there is no
+   per-image tuning, and there should not be, so what matters is whether the page still looks right. That
+   was adopted and the per-image code removed. `prepare` makes the compressed copy once with the current
+   settings, with progress, and the app keeps it (three at most), so **saving writes exactly the version
+   compared**. Both versions are drawn by the isolated renderer; the copy reaches it through a pipe and
+   is never written to disk. The window offers a divider, side by side, or "Show differences", which
+   marks pixels that changed by 32 of 255 or more, more strongly the more they changed, and reports the
+   share at that zoom. It works through the page in strips with small canvases: at 4× on a Retina screen,
+   page-sized canvases ran into WebKit's limit on canvas memory and came back blank, which marked the
+   whole page; a blank canvas is now reported instead; zoom is Fit,
+   2× or 4×, with previous and next page. A shortcut from each image row to its page, zoomed to the image,
+   was tried and dropped at the owner's request: comparison is per page only. The window is resizable
+   from its corner (CSS `resize`, which every platform's webview supports). Fit shows the whole page by
+   width and height, the layout follows every resize at once, and the page is drawn again, sharper,
+   when the window grows by more than a quarter.
+4. **Language button.** The drop-down became a compact button: a globe and a short label, uppercase codes
+   for Latin-script languages (EN) and native names for CJK (한국어, since 한글 names the script, not the
+   language). The menu lists full names. It stays in the window's header rather than the title bar:
+   Tauri can only overlay the title bar on macOS, and on Windows and Linux that would mean drawing
+   custom window controls.
+5. **Page list tools.** Only pages with issues, largest first, expand all and collapse all became icon
+   buttons with tooltips drawn by the app (the same on every platform, unlike system tooltips); the first
+   two are toggles that show when they are on.
+6. **Comparison, refined.** A clear "Compare page" button in each page's detail, and clicking any page
+   thumbnail compares that page, even when nothing on it changes. The window fills the app window and
+   follows it as it is resized; "Original" and the preset's name are pinned to the swipe view's top
+   corners; changing the zoom centres the view and puts the divider in the middle of the screen, and
+   scrolling the divider out of sight brings it back to the middle of the view. The page behind stops
+   scrolling, and hides its scroll bar, while the window is open. In "Show differences" the page
+   underneath turns grey, so only real differences are in colour.
+7. **Theme button** beside the language button: System (the default, following the operating system),
+   Light and Dark, with monitor, sun and moon icons. A choice also sets the window frame's theme through
+   Tauri where the platform allows it. Colours are defined once for light and once for dark, used by the
+   system preference unless Light or Dark is chosen. The preview harness now passes its light or dark
+   argument as this setting, so its screenshots no longer depend on the Mac's own appearance.
+   In the dark theme the app icon gets a faint light edge and the header buttons a slightly stronger
+   border, so neither disappears into the background.
+8. **Removing files.** Each file chip has a ×. It takes the file off the list, and a file removed while it is
+   being analysed is simply forgotten when the analysis returns.
+9. **Minor release routine.** Security review as above, including the renderer drawing compressed copies.
+   The 19-file analysis corpus (2 GB bombs) was rerun: every hostile file peaks at 486 MB or less, and the
+   legitimate 500,000-object file takes 10 s and 2.2 GB, the same as 0.3.1. The renderer was also checked
+   from inside the built `.app`. Real files are unchanged: identical text, same savings. `v0.4.0` is tagged
+   once committed and green.
 
 ## 0.3.1, 19 October 2026
 

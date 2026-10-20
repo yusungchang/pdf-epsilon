@@ -1,4 +1,4 @@
-use epsilon::{analyze_bytes, compress_bytes, Preset, Status};
+use epsilon::{analyze_bytes, analyze_bytes_with_progress, compress_bytes, Preset, Status};
 use lopdf::{dictionary, Document, Object, Stream};
 
 /// One letter-size page drawing a 2000 px photo-like image in a 2 x 2 inch box and a
@@ -185,4 +185,19 @@ fn analysis_finds_thumbnails_and_images_off_the_page() {
 #[test]
 fn analysis_refuses_garbage() {
     assert!(analyze_bytes(b"not a pdf").is_err());
+}
+
+#[test]
+fn progress_stays_between_zero_and_one_and_finishes() {
+    let seen = std::sync::Mutex::new(Vec::new());
+    analyze_bytes_with_progress(&sample_pdf(), &|p| seen.lock().unwrap().push(p)).unwrap();
+    let seen = seen.into_inner().unwrap();
+    assert!(seen.len() > 3, "{seen:?}");
+    assert!(seen.iter().all(|p| (0.0..=1.0).contains(p)), "{seen:?}");
+    assert!(seen.iter().copied().fold(0.0f32, f32::max) > 0.999, "{seen:?}");
+}
+
+#[test]
+fn base64_matches_the_standard() {
+    assert_eq!(epsilon::to_base64(b"Many hands"), "TWFueSBoYW5kcw==");
 }

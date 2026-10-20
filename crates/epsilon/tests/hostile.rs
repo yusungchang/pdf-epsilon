@@ -1,5 +1,7 @@
 //! Hostile PDFs: each targets one way a file could exhaust memory, loop or overflow the stack
-//! while PDF Epsilon reads it. Every case must finish quickly with a result or a clean error.
+//! while PDF Epsilon reads it: analysis and compression. Every case must
+//! finish quickly with a result or a clean error. (Thumbnails are rendered in a separate,
+//! memory-capped process; see src-tauri/src/render.rs.)
 //!
 //! The work runs on a thread with a 1 MiB stack, smaller than any platform default (Windows
 //! gives its main thread 1 MiB; macOS and Linux give more), so deep recursion that passes here

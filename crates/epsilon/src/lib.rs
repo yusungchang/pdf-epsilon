@@ -36,6 +36,18 @@ use serde::{Deserialize, Serialize};
 
 pub use analyze::*;
 pub use message::{Arg, Message};
+/// Standard base64 with padding, for handing images to the interface as `data:` URLs.
+pub fn to_base64(data: &[u8]) -> String {
+    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
+    for c in data.chunks(3) {
+        let n = (c[0] as u32) << 16 | (*c.get(1).unwrap_or(&0) as u32) << 8 | *c.get(2).unwrap_or(&0) as u32;
+        for i in 0..4 {
+            out.push(if i <= c.len() { T[(n >> (18 - 6 * i)) as usize & 63] as char } else { '=' });
+        }
+    }
+    out
+}
 pub use images::ImagePolicy;
 
 /// Ready-made settings, from untouched pixels to smallest file.
@@ -194,8 +206,14 @@ pub fn compress_file(input: &Path, output: &Path, options: &Options) -> Result<R
 /// Compress a PDF held in memory. Returns the new bytes, or the original bytes
 /// when nothing could be saved.
 pub fn compress_bytes(input: &[u8], options: &Options) -> Result<(Vec<u8>, Report)> {
+    compress_bytes_with_progress(input, options, &|_| {})
+}
+
+/// Like [`compress_bytes`], reporting progress from 0 to 1 as it goes.
+pub fn compress_bytes_with_progress(input: &[u8], options: &Options, progress: &dyn Fn(f32)) -> Result<(Vec<u8>, Report)> {
     let doc = load(input)?;
-    let run = optimize(input, doc, options)?;
+    let run = optimize(input, doc, options, progress)?;
+    progress(1.0);
     Ok((run.bytes, run.report))
 }
 
@@ -245,7 +263,8 @@ struct Run {
     pruned: Vec<ObjectId>,
 }
 
-fn optimize(input: &[u8], mut doc: Document, options: &Options) -> Result<Run> {
+/// Runs the pipeline. `progress` gets the share done, from 0 to 1; images take most of it.
+fn optimize(input: &[u8], mut doc: Document, options: &Options, progress: &dyn Fn(f32)) -> Result<Run> {
     let mut report = Report { input_bytes: input.len() as u64, ..Report::default() };
     let pages = doc.get_pages().len() as u32;
     report.pages = pages;
@@ -257,7 +276,7 @@ fn optimize(input: &[u8], mut doc: Document, options: &Options) -> Result<Run> {
     if let Some(policy) = &options.images {
         let sizes = placement::display_sizes(&doc);
         let fallback = placement::largest_page(&doc);
-        let stats = images::recompress(&mut doc, policy, &sizes, fallback);
+        let stats = images::recompress(&mut doc, policy, &sizes, fallback, &|f| progress(0.05 + 0.75 * f));
         report.images_seen = stats.seen;
         report.images_downsampled = stats.downsampled;
         report.images_reencoded = stats.reencoded;
@@ -266,6 +285,7 @@ fn optimize(input: &[u8], mut doc: Document, options: &Options) -> Result<Run> {
         report.images_seen = images::count(&doc);
     }
 
+    progress(0.8);
     let subsets = if options.subset_fonts { subset::subset_fonts(&mut doc) } else { Vec::new() };
     report.fonts_subset = subsets.len() as u32;
     let slimmed = if options.strip_font_tables { fonts::strip_tables(&mut doc) } else { Vec::new() };
@@ -279,7 +299,9 @@ fn optimize(input: &[u8], mut doc: Document, options: &Options) -> Result<Run> {
     renumber(&mut doc);
     doc.compress();
 
+    progress(0.9);
     let out = save(&mut doc)?;
+    progress(0.97);
 
     // Verify: the result must parse and have the same pages.
     let check = load_bounded(&out).map_err(|e| Error::Verify(e.to_string()))?;

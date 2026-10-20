@@ -12,6 +12,7 @@
 //! 5. Findings for the whole file, and issues for each page, are drawn from all of that.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Instant;
 
 use lopdf::xref::XrefEntry;
@@ -285,30 +286,71 @@ pub fn analyze_file(input: &std::path::Path) -> Result<Analysis> {
 
 /// Analyse a PDF held in memory.
 pub fn analyze_bytes(input: &[u8]) -> Result<Analysis> {
+    analyze_bytes_with_progress(input, &|_| {})
+}
+
+/// Like [`analyze_file`], reporting progress from 0 to 1 as it goes. `progress` is called
+/// from several threads, often; throttle anything expensive it does.
+pub fn analyze_file_with_progress(input: &std::path::Path, progress: &(dyn Fn(f32) + Sync)) -> Result<Analysis> {
+    let bytes = crate::read_input(input)?;
+    analyze_bytes_with_progress(&bytes, progress)
+}
+
+/// Shares of the work, combined into one figure: inspection, then the four preset runs.
+struct Tracker<'a> {
+    parts: [AtomicU32; 5],
+    report: &'a (dyn Fn(f32) + Sync),
+}
+
+impl Tracker<'_> {
+    /// Inspection is quick next to the preset runs, which recompress images.
+    const WEIGHTS: [f32; 5] = [0.12, 0.22, 0.22, 0.22, 0.22];
+
+    fn set(&self, part: usize, done: f32) {
+        self.parts[part].store((done.clamp(0.0, 1.0) * 1000.0) as u32, Ordering::Relaxed);
+        let total: f32 = self.parts.iter().zip(Self::WEIGHTS).map(|(p, w)| p.load(Ordering::Relaxed) as f32 / 1000.0 * w).sum();
+        (self.report)(total.min(1.0));
+    }
+}
+
+pub fn analyze_bytes_with_progress(input: &[u8], progress: &(dyn Fn(f32) + Sync)) -> Result<Analysis> {
     let started = Instant::now();
     let doc = crate::load(input)?;
+    let tracker = Tracker { parts: Default::default(), report: progress };
+    tracker.set(0, 0.0);
 
     // Large documents run the presets one after another: each copy of a document costs a few
     // kilobytes per object, and five at once is too much for files with hundreds of thousands.
     if doc.objects.len() > crate::limits::PARALLEL_OBJECTS {
-        let mut a = Inspector::new(input, &doc).inspect();
-        let runs: Vec<Result<Run>> = Preset::ALL.iter().map(|p| crate::optimize(input, doc.clone(), &p.options())).collect();
+        let mut a = Inspector::new(input, &doc, &tracker).inspect();
+        let runs: Vec<Result<Run>> = Preset::ALL
+            .iter()
+            .enumerate()
+            .map(|(i, p)| crate::optimize(input, doc.clone(), &p.options(), &|f| tracker.set(i + 1, f)))
+            .collect();
         a.apply_runs(&runs);
         let mut analysis = a.finish();
         analysis.millis = started.elapsed().as_millis() as u64;
+        tracker.set(0, 1.0);
         return Ok(analysis);
     }
 
     // Every preset runs on its own copy, at the same time as the inspection below.
     let (runs, mut a) = std::thread::scope(|s| {
+        let tracker = &tracker;
         let handles: Vec<_> = Preset::ALL
             .iter()
-            .map(|p| {
+            .enumerate()
+            .map(|(i, p)| {
                 let copy = doc.clone();
-                s.spawn(move || crate::optimize(input, copy, &p.options()))
+                s.spawn(move || {
+                    let run = crate::optimize(input, copy, &p.options(), &|f| tracker.set(i + 1, f));
+                    tracker.set(i + 1, 1.0);
+                    run
+                })
             })
             .collect();
-        let inspected = Inspector::new(input, &doc).inspect();
+        let inspected = Inspector::new(input, &doc, tracker).inspect();
         let runs: Vec<Result<Run>> = handles
             .into_iter()
             .map(|h| h.join().unwrap_or_else(|_| Err(Error::Verify("the preset run crashed".into()))))
@@ -327,6 +369,7 @@ pub fn analyze_bytes(input: &[u8]) -> Result<Analysis> {
 struct Inspector<'a> {
     input: &'a [u8],
     doc: &'a Document,
+    tracker: &'a Tracker<'a>,
     span: HashMap<ObjectId, u64>,
     category: HashMap<ObjectId, Category>,
     reachable: HashSet<ObjectId>,
@@ -362,10 +405,11 @@ struct PageParts {
 }
 
 impl<'a> Inspector<'a> {
-    fn new(input: &'a [u8], doc: &'a Document) -> Self {
+    fn new(input: &'a [u8], doc: &'a Document, tracker: &'a Tracker<'a>) -> Self {
         Inspector {
             input,
             doc,
+            tracker,
             span: HashMap::new(),
             category: HashMap::new(),
             reachable: HashSet::new(),
@@ -384,8 +428,10 @@ impl<'a> Inspector<'a> {
 
         // Walk every page once.
         let mut walks = Vec::with_capacity(self.pages.len());
+        let count = self.pages.len().max(1) as f32;
         for (&number, &page_id) in &self.pages {
             walks.push((number, page_id, walk_page(self.doc, page_id)));
+            self.tracker.set(0, 0.8 * walks.len() as f32 / count);
         }
 
         let (images, image_ids) = self.images(&walks);
@@ -401,6 +447,7 @@ impl<'a> Inspector<'a> {
             .map(|(id, _)| self.span_of(*id))
             .sum();
 
+        self.tracker.set(0, 1.0);
         Inspected {
             file,
             span: self.span,
@@ -1216,7 +1263,7 @@ impl Inspected {
         // Font data no viewer reads, measured from the runs.
         let slimmed = per_run(|r| &r.fonts);
         let slimmed_count = runs.first().and_then(|r| r.as_ref().ok()).map(|r| r.fonts.len()).unwrap_or(0);
-        if slimmed.iter().any(|b| *b > 0) {
+        if slimmed.iter().any(|b| *b >= 1024) {
             push(
                 "fontTables",
                 Status::Fixed,

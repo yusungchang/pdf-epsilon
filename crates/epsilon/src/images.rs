@@ -74,21 +74,18 @@ pub fn count(doc: &Document) -> u32 {
     doc.objects.values().filter(|o| is_image(o)).count() as u32
 }
 
-pub fn recompress(
-    doc: &mut Document,
-    policy: &ImagePolicy,
-    sizes: &HashMap<ObjectId, Size>,
-    fallback: Size,
-) -> Stats {
-    let mut stats = Stats::default();
-    let ids: Vec<ObjectId> = doc.objects.iter().filter(|(_, o)| is_image(o)).map(|(id, _)| *id).collect();
-    stats.seen = ids.len() as u32;
+/// Which images are soft masks of which, and which must keep their size.
+struct Context {
+    parent_of: HashMap<ObjectId, ObjectId>,
+    fixed_size: HashSet<ObjectId>,
+}
 
+fn context(doc: &Document, ids: &[ObjectId]) -> Context {
     // Soft masks are judged by their parent's drawn size and are never made lossy.
     // A /Matte soft mask must keep its parent's dimensions, so neither is resized.
     let mut parent_of: HashMap<ObjectId, ObjectId> = HashMap::new();
     let mut fixed_size: HashSet<ObjectId> = HashSet::new();
-    for id in &ids {
+    for id in ids {
         let Ok(Object::Stream(s)) = doc.get_object(*id) else { continue };
         if let Ok(Object::Reference(mask)) = s.dict.get(b"SMask") {
             parent_of.insert(*mask, *id);
@@ -100,20 +97,40 @@ pub fn recompress(
             }
         }
     }
+    Context { parent_of, fixed_size }
+}
 
-    for id in ids {
+impl Context {
+    fn job(&self, id: ObjectId, sizes: &HashMap<ObjectId, Size>, fallback: Size) -> Job {
         let drawn = sizes
             .get(&id)
-            .or_else(|| parent_of.get(&id).and_then(|p| sizes.get(p)))
+            .or_else(|| self.parent_of.get(&id).and_then(|p| sizes.get(p)))
             .copied()
             .filter(|(w, h)| *w >= 1.0 && *h >= 1.0)
             .unwrap_or(fallback);
+        Job { drawn, is_soft_mask: self.parent_of.contains_key(&id), may_resize: !self.fixed_size.contains(&id) }
+    }
+}
+
+/// Recompresses every image the policy can improve. `progress` gets the share of images
+/// done, from 0 to 1.
+pub fn recompress(
+    doc: &mut Document,
+    policy: &ImagePolicy,
+    sizes: &HashMap<ObjectId, Size>,
+    fallback: Size,
+    progress: &dyn Fn(f32),
+) -> Stats {
+    let mut stats = Stats::default();
+    let ids: Vec<ObjectId> = doc.objects.iter().filter(|(_, o)| is_image(o)).map(|(id, _)| *id).collect();
+    stats.seen = ids.len() as u32;
+    let ctx = context(doc, &ids);
+
+    let total = ids.len().max(1) as f32;
+    for (i, id) in ids.into_iter().enumerate() {
+        progress(i as f32 / total);
+        let job = ctx.job(id, sizes, fallback);
         let Ok(Object::Stream(stream)) = doc.get_object(id) else { continue };
-        let job = Job {
-            drawn,
-            is_soft_mask: parent_of.contains_key(&id),
-            may_resize: !fixed_size.contains(&id),
-        };
         let before = stream.content.len();
         let Some(done) = process(doc, stream, policy, job) else { continue };
         if done.downsampled {
@@ -132,6 +149,7 @@ pub fn recompress(
         });
         doc.objects.insert(id, Object::Stream(done.stream));
     }
+    progress(1.0);
     stats
 }
 
@@ -147,9 +165,10 @@ struct Done {
     reencoded: bool,
 }
 
-fn process(doc: &Document, stream: &Stream, policy: &ImagePolicy, job: Job) -> Option<Done> {
+/// The pixels of an image this module understands, and whether it was stored as JPEG.
+fn decode_pixels(doc: &Document, stream: &Stream, is_soft_mask: bool) -> Option<(DynamicImage, bool)> {
     let dict = &stream.dict;
-    if unsupported(doc, dict, job.is_soft_mask).is_some() {
+    if unsupported(doc, dict, is_soft_mask).is_some() {
         return None;
     }
     let width = u32::try_from(int(doc, dict, b"Width")?).ok()?;
@@ -157,11 +176,8 @@ fn process(doc: &Document, stream: &Stream, policy: &ImagePolicy, job: Job) -> O
     if width == 0 || height == 0 || width as u64 * height as u64 > crate::limits::IMAGE_PIXELS {
         return None;
     }
-    let space = colour_space(doc, dict, job.is_soft_mask)?;
-    let filters = filters(dict);
-    let original_len = stream.content.len();
-
-    let (pixels, was_jpeg) = match filters.as_slice() {
+    let space = colour_space(doc, dict, is_soft_mask)?;
+    let decoded = match filters(dict).as_slice() {
         [f] if f == b"DCTDecode" => {
             let img = image::load_from_memory_with_format(&stream.content, ImageFormat::Jpeg).ok()?;
             let img = match (space, img) {
@@ -183,6 +199,14 @@ fn process(doc: &Document, stream: &Stream, policy: &ImagePolicy, job: Job) -> O
         }
         _ => return None,
     };
+    Some(decoded)
+}
+
+fn process(doc: &Document, stream: &Stream, policy: &ImagePolicy, job: Job) -> Option<Done> {
+    let dict = &stream.dict;
+    let original_len = stream.content.len();
+    let (pixels, was_jpeg) = decode_pixels(doc, stream, job.is_soft_mask)?;
+    let (width, height) = (pixels.width(), pixels.height());
 
     // How many pixels does the drawn size actually need?
     let need_w = job.drawn.0 / 72.0 * policy.max_dpi;
