@@ -128,5 +128,6 @@ cargo run -p epsilon --release --example squeeze -- in.pdf out.pdf balanced
 Every push to `main` makes GitHub Actions run the tests and build installers for every
 platform. They can be downloaded from the run's artifacts for 14 days. Pushing a tag such as
 `v0.2.0` builds the same installers into a draft release: `.dmg` and `.app` for macOS, `.msi` and `.exe` for
-Windows, and `.deb`, `.rpm` and `.AppImage` for Linux. The builds are not code-signed
-yet. macOS Gatekeeper and Windows SmartScreen will warn on first launch.
+Windows, and `.deb`, `.rpm` and `.AppImage` for Linux. The builds are not signed with a
+developer certificate yet. On macOS, open the app once from System Settings, Privacy & Security,
+Open Anyway; Windows SmartScreen asks for More info, Run anyway.

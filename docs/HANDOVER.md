@@ -121,7 +121,11 @@ truncated PDF both give a clear "not a readable PDF" message.
 - **Progress is per file only.** There is no progress within a single large file.
 - **Files are processed one at a time.**
 - **No "Open With" support.** Files dropped on the Dock icon or opened from Finder are not handled yet.
-- **Installers are unsigned.** Gatekeeper and SmartScreen will warn on first launch.
+- **Installers are not signed with a developer certificate.** The Mac app is ad-hoc signed, which is valid but
+  anonymous: macOS asks for confirmation on first launch (System Settings, Privacy & Security, Open Anyway).
+  An app that says "damaged" has a broken signature; check with `codesign --verify --deep --strict`.
+  Windows SmartScreen also warns. Removing the warnings needs an Apple Developer ID with notarization and a
+  Windows code-signing certificate.
 - **No license file.** The manifests say `UNLICENSED` until the owner chooses one.
 - **The domain is unregistered.** pdfepsilon.com showed no whois match on 19 October 2026, but it has not been bought.
 

@@ -71,6 +71,15 @@ The owner asked for four features, after an estimate of what each costs.
    from inside the built `.app`. Real files are unchanged: identical text, same savings. `v0.4.0` is tagged
    once committed and green.
 
+10. **Mac installers fixed before publishing.** The first v0.4.0 build said "damaged" when downloaded on macOS.
+    The app carried only the linker's ad-hoc signature on its executable, which does not seal the bundle
+    ("code has no resources but signature indicates they must be present"), and Gatekeeper treats a
+    downloaded app with a broken signature as damaged. `bundle.macOS.signingIdentity: "-"` now has Tauri
+    ad-hoc sign the whole bundle (with the hardened runtime); `codesign --verify --deep --strict` passes,
+    and the thumbnail renderer still works and is still capped from the signed bundle. The unpublished
+    draft was deleted and v0.4.0 rebuilt from the fix. Without an Apple Developer ID and notarization,
+    macOS still asks for confirmation the first time (System Settings, Privacy & Security, Open Anyway).
+
 ## 0.3.1, 19 October 2026
 
 The owner asked whether reading a PDF could be an attack vector, on every platform.
