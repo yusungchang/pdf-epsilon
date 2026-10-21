@@ -66,6 +66,10 @@ raised and deliberately left for later.
    (로컬 처리, 결정론적 처리, 스트레스 테스트, CVE 점검, 외부 통신 없음, 무상 제공) and the half-lines are the
    marketing voice (시킨 일만, 정확하게; 공짜. 진짜 있습니다.). "No AI inside" became "Deterministic", and
    "No tracking" was dropped, at the owner's request. "Free" means free of cost: the code has no license yet.
+10. **"Details".** The folded block below the save button was called "Advanced" next to "Advanced settings";
+    it is now "Details" (세부 정보), which says what it holds. The website's research-paper result was corrected
+    to 777 KB (remeasured), and its qpdf figure now says "many deliberately broken" rather than calling all
+    706 files hostile.
 
 ## 0.5.0, 21 October 2026
 
