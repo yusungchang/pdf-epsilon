@@ -70,6 +70,9 @@ raised and deliberately left for later.
     it is now "Details" (세부 정보), which says what it holds. The website's research-paper result was corrected
     to 777 KB (remeasured), and its qpdf figure now says "many deliberately broken" rather than calling all
     706 files hostile.
+    On the page, the comparison ("See it before you save it") now follows the features, and the security
+    section sits after the results with a smaller heading and plainer numbers, as supporting evidence; its
+    Korean heading is 가장 까다로운 PDF로 검증했습니다.
 
 ## 0.5.0, 21 October 2026
 

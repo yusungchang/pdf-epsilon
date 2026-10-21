@@ -104,7 +104,14 @@ a.badge:hover { text-decoration: none; border-color: var(--accent); }
 .numbers strong { display: block; font-size: 34px; color: var(--good); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .numbers span { color: var(--muted); font-size: 14px; }
 
-.security .numbers strong { color: var(--accent); }
+/* Supporting evidence, quieter than the sections above it. */
+.security { padding-top: 24px; }
+.security h2 { font-size: clamp(20px, 2.6vw, 24px); }
+.security .sub { font-size: 15px; max-width: 640px; margin-left: auto; margin-right: auto; }
+.security .numbers div { padding: 14px; background: transparent; }
+.security .numbers strong { color: var(--ink); font-size: 22px; }
+.security .numbers span { font-size: 13px; }
+.security .checks { font-size: 14px; margin-top: 20px; }
 .checks { list-style: none; padding: 0; margin: 28px auto 0; max-width: 680px; display: grid; gap: 10px; }
 .checks li { position: relative; padding-left: 28px; color: var(--muted); }
 .checks li::before { content: "✓"; position: absolute; left: 4px; color: var(--good); font-weight: 700; }
