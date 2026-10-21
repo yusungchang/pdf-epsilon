@@ -73,7 +73,9 @@ h2 { font-size: clamp(26px, 4vw, 36px); margin: 0 0 10px; text-align: center; }
 .button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .button.primary:hover { filter: brightness(1.08); }
 .version { color: var(--muted); font-size: 14px; margin: 14px 0 0; }
-.badges { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 900px; margin: 30px auto 0; }
+/* Six badges: two even rows of three; on narrow screens they wrap freely. */
+.badges { display: grid; grid-template-columns: repeat(3, max-content); justify-content: center; gap: 10px; margin: 30px auto 0; }
+@media (max-width: 820px) { .badges { display: flex; flex-wrap: wrap; } }
 .badge {
   display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; text-align: left;
   background: var(--panel); border: 1px solid var(--line); border-radius: 999px; color: var(--ink);

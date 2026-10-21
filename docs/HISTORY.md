@@ -57,16 +57,15 @@ raised and deliberately left for later.
 8. **Website.** A section, "Tested against the worst PDFs we could find", gives the numbers above and links
    to `SECURITY.md`. "Private and careful" became "Your files stay home", and the footer says "Your PDFs
    never leave home." The app screenshots were retaken with the update button.
-9. **Badges.** Seven pills under the download buttons, researched first: there is no standard badge for most
-   of these claims, and the "Not By AI" kind means a work was made without AI, which is not true here (the app
-   contains no AI, but was written with AI help), so none was borrowed. One icon set drawn for the page on a
-   24 px grid with a 1.75 stroke in the same tinted circle, the "no" icons sharing one slash. Each pill is a
-   short label and a light half-line, linking to its proof where there is one. English labels are kept to
-   10–13 characters with the standard terms where they exist: Local only, No AI inside, Stress-tested,
-   CVE-checked, No phone-home, No tracking, Free to use. Korean labels use official, technical words (로컬 처리,
-   AI 미사용, 스트레스 테스트, CVE 점검, 외부 통신 없음, 트래킹 없음, 무상 제공) and the half-lines are the
-   marketing voice (내 파일은 내 컴퓨터에만, 공짜. 진짜 있습니다.). "Free" means free of cost: the code has
-   no license yet. "No tracking" holds only while the site has no analytics.
+9. **Badges.** Six pills under the download buttons, researched first: there is no standard badge for most
+   of these claims, and "Not By AI" badges mean a work was made without AI, which is not true here, so none was
+   borrowed. One icon set drawn for the page on a 24 px grid with a 1.75 stroke in the same tinted circle, the
+   "no" icons sharing one slash. Each pill is a short label and a light half-line, linking to its proof where
+   there is one. English labels are kept to 10–13 characters: Local only, Deterministic (Does just what you
+   ask), Stress-tested, CVE-checked, No phone-home, Free to use. Korean labels use official, technical words
+   (로컬 처리, 결정론적 처리, 스트레스 테스트, CVE 점검, 외부 통신 없음, 무상 제공) and the half-lines are the
+   marketing voice (시킨 일만, 정확하게; 공짜. 진짜 있습니다.). "No AI inside" became "Deterministic", and
+   "No tracking" was dropped, at the owner's request. "Free" means free of cost: the code has no license yet.
 
 ## 0.5.0, 21 October 2026
 
