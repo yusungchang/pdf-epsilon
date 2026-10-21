@@ -1,6 +1,14 @@
 {
   "language.label": "Language",
 
+  "update.label": "Check for updates",
+  "update.current": "You have version {version}.",
+  "update.checking": "Checking…",
+  "update.latest": "You’re up to date.",
+  "update.available": "Version {version} is out.",
+  "update.download": "Open the download page",
+  "update.failed": "Couldn’t reach GitHub. Check your connection, or visit the website.",
+  "update.privacy": "Only version numbers are compared. Your files stay right here.",
   "theme.label": "Theme",
   "theme.system": "System",
   "theme.light": "Light",
@@ -276,6 +284,7 @@
   "error.tooLarge": "The file is too large for PDF Epsilon (over 2 GB).",
   "error.tooComplex": "The file has too many parts for PDF Epsilon to handle safely (over a million objects).",
   "error.verify": "The smaller file failed verification, so nothing was written. The original is unchanged.",
+  "error.damaged": "Part of this file is damaged, so PDF Epsilon won’t change it. The original is untouched.",
   "error.internal": "Something went wrong inside PDF Epsilon.",
   "error.start": "Could not start: {detail}"
 }

@@ -11,6 +11,8 @@ current state, verified results, design decisions and next steps. Then read `REA
   `subset.rs` subsets fully embedded TrueType CID fonts, `fonts.rs` drops font tables
   no viewer reads, `images.rs` recompresses,
   `dedup.rs` merges identical streams, and `clean.rs` strips optional data.
+  `revisions.rs` finds objects a later revision deleted (lopdf ignores that); `damage` in `lib.rs`
+  refuses to write a copy when lopdf misread part of the file.
 - `src-tauri` is the shell with commands `presets`, `file_size`, `analyze` (with progress),
   `prepare` (the compressed copy for comparison, kept so saving writes exactly it), `render`,
   `forget` and `compress`. `render.rs` draws pages with hayro in a separate, memory-capped copy of
@@ -58,7 +60,8 @@ After every y increase (0.3 → 0.4), and only then, before calling the version 
 1. **Security review.** Check every new or changed parsing path against `docs/SECURITY.md`:
    all decoding goes through `limits.rs`, nothing recurses or loops without a bound. Add
    cases to `tests/hostile.rs` for new paths, rerun the hostile corpus by hand (bombs of
-   2 GB, a 500,000-object file), and record peak memory and time in `HISTORY.md`.
+   2 GB, a 500,000-object file), run the qpdf corpus with the text comparison and
+   `examples/fuzz.rs` (see `docs/SECURITY.md`), and record peak memory and time in `HISTORY.md`.
 2. **Release tag.** Once CI passes on `main`, tag `vX.Y.0` on that commit and push the tag,
    which builds a draft release with every installer. z versions (0.3.1) are not tagged. Raise z in all three files with each change, and add a line
 to the Versions table in `docs/HISTORY.md`. Update `docs/HANDOVER.md` when the state changes.

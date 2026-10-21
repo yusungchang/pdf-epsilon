@@ -37,6 +37,36 @@
         <a class="button" href="#download" data-t="hero.other">All downloads</a>
       </div>
       <p id="version" class="version" hidden></p>
+      <div class="badges">
+        <a class="badge" href="#features">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2.5 19h19"/></svg>
+          <span><b data-t="b1.label">Local only</b><small data-t="b1.sub">Your files stay home</small></span>
+        </a>
+        <div class="badge">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l1.8 4.7L18.5 10.5l-4.7 1.8L12 17l-1.8-4.7L5.5 10.5l4.7-1.8z"/><path class="cut" d="M4 4l16 16"/><path d="M4 4l16 16"/></svg>
+          <span><b data-t="b2.label">No AI inside</b><small data-t="b2.sub">No hallucinations</small></span>
+        </div>
+        <a class="badge" href="#security">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.2-2.9 7.6-7 9.5c-4.1-1.9-7-5.3-7-9.5V6z"/><path d="M9 12l2.2 2.2L15.5 10"/></svg>
+          <span><b data-t="b3.label">Stress-tested</b><small data-t="b3.sub">200,000 broken PDFs</small></span>
+        </a>
+        <a class="badge" href="https://github.com/yusungchang/pdf-epsilon/actions/workflows/audit.yml">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 8.5a2.5 2.5 0 0 1 5 0"/><rect x="8" y="8.5" width="8" height="11" rx="4"/><path d="M12 12v7.5M8 12.5H4.5M8 16.5H4.5M16 12.5h3.5M16 16.5h3.5M9.8 6.6L8 4.8M14.2 6.6L16 4.8"/></svg>
+          <span><b data-t="b4.label">CVE-checked</b><small data-t="b4.sub">Every build, every week</small></span>
+        </a>
+        <a class="badge" href="https://github.com/yusungchang/pdf-epsilon/blob/main/docs/SECURITY.md">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 18.5h9.5a4 4 0 0 0 .6-7.96A5.8 5.8 0 0 0 6.4 9.9a4.3 4.3 0 0 0 1.1 8.6z"/><path class="cut" d="M4 4l16 16"/><path d="M4 4l16 16"/></svg>
+          <span><b data-t="b5.label">No phone-home</b><small data-t="b5.sub">Updates when you ask</small></span>
+        </a>
+        <div class="badge">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 6 12 6s9.5 6 9.5 6S18 18 12 18S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/><path class="cut" d="M4 4l16 16"/><path d="M4 4l16 16"/></svg>
+          <span><b data-t="b6.label">No tracking</b><small data-t="b6.sub">Not even on this page</small></span>
+        </div>
+        <a class="badge" href="#download">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10.5" width="16" height="9.5" rx="1"/><rect x="3" y="7.5" width="18" height="3" rx="1"/><path d="M12 7.5V20"/><path d="M12 7.5C10.8 4.6 7.5 4.3 7.5 6.1C7.5 7.4 10 7.5 12 7.5C14 7.5 16.5 7.4 16.5 6.1C16.5 4.3 13.2 4.6 12 7.5z"/></svg>
+          <span><b data-t="b7.label">Free to use</b><small data-t="b7.sub">As in free lunch</small></span>
+        </a>
+      </div>
       <figure class="shot hero-shot">
         <img id="shot-report" src="shots/report.png" alt="PDF Epsilon showing where the bytes of a report go and what each preset saves" width="1640" height="1600">
       </figure>
@@ -66,8 +96,8 @@
           <p data-t="f5.text">Only the letters in use are kept. One file went from 15 MB to 80 KB.</p>
         </article>
         <article>
-          <h3 data-t="f6.title">Private and careful</h3>
-          <p data-t="f6.text">Works offline, and leaves alone anything it doesn’t fully understand.</p>
+          <h3 data-t="f6.title">Your files stay home</h3>
+          <p data-t="f6.text">Everything happens on your computer. No uploads, no accounts, no one peeking.</p>
         </article>
       </div>
     </section>
@@ -81,6 +111,23 @@
         <div><strong>−67%</strong><span data-t="r3">Conference slide deck<br>3.3 MB → 1.1 MB</span></div>
         <div><strong>−28%</strong><span data-t="r4">49-page survey report<br>3.0 MB → 2.2 MB</span></div>
       </div>
+    </section>
+
+    <section id="security" class="security">
+      <h2 data-t="sec.title">Tested against the worst PDFs we could find</h2>
+      <p class="sub" data-t="sec.sub">A PDF can be built to crash, freeze or fool the program that opens it. Before release, PDF Epsilon went through:</p>
+      <div class="numbers">
+        <div><strong>200,000</strong><span data-t="sec.n1">randomly damaged PDFs,<br>not one crash or freeze</span></div>
+        <div><strong>706</strong><span data-t="sec.n2">broken and hostile files<br>from the qpdf test suite</span></div>
+        <div><strong>483 / 483</strong><span data-t="sec.n3">compressed copies with<br>exactly the same text</span></div>
+        <div><strong>2 GB</strong><span data-t="sec.n4">decompression bombs,<br>stopped under 450 MB</span></div>
+      </div>
+      <ul class="checks">
+        <li data-t="sec.c1">Damaged parts are never guessed at. The file is left exactly as it was.</li>
+        <li data-t="sec.c2">Pages are drawn in a separate process with a memory limit, so a bad file can’t take the app down.</li>
+        <li data-t="sec.c3">Every library is checked against the public list of known vulnerabilities on every build.</li>
+      </ul>
+      <p class="all"><a href="https://github.com/yusungchang/pdf-epsilon/blob/main/docs/SECURITY.md" data-t="sec.more">How PDF Epsilon handles hostile files</a></p>
     </section>
 
     <section class="showcase">
@@ -143,7 +190,7 @@
   </main>
 
   <footer>
-    <p><span data-t="footer.text">PDF Epsilon runs entirely on your computer.</span> · <a href="https://github.com/yusungchang/pdf-epsilon" data-t="footer.source">Source on GitHub</a> · <a href="https://github.com/yusungchang/pdf-epsilon/issues/new/choose" data-t="footer.bug">Report a bug</a></p>
+    <p><span data-t="footer.text">Your PDFs never leave home.</span> · <a href="https://github.com/yusungchang/pdf-epsilon" data-t="footer.source">Source on GitHub</a> · <a href="https://github.com/yusungchang/pdf-epsilon/issues/new/choose" data-t="footer.bug">Report a bug</a></p>
     <p class="author"><span data-t="footer.author">Made by</span> <a href="https://www.linkedin.com/in/yusungchang/" rel="author">yusungchang</a> · © 2026</p>
   </footer>
 

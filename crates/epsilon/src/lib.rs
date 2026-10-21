@@ -27,6 +27,7 @@ mod fonts;
 mod images;
 mod limits;
 mod placement;
+mod revisions;
 mod subset;
 
 use std::path::Path;
@@ -167,6 +168,8 @@ pub enum Error {
     TooComplex,
     #[error("the optimised file failed verification ({0}); the original was not changed")]
     Verify(String),
+    #[error("{0} parts of the file could not be read, so it is left unchanged")]
+    Damaged(usize),
 }
 
 impl Error {
@@ -180,6 +183,7 @@ impl Error {
             Error::TooLarge => "tooLarge",
             Error::TooComplex => "tooComplex",
             Error::Verify(_) => "verify",
+            Error::Damaged(_) => "damaged",
         }
     }
 
@@ -188,6 +192,7 @@ impl Error {
         match self {
             Error::Io(e) => e.to_string(),
             Error::Parse(d) | Error::Verify(d) => d.clone(),
+            Error::Damaged(n) => format!("{n} unreadable objects"),
             Error::Encrypted | Error::TooLarge | Error::TooComplex => String::new(),
         }
     }
@@ -265,6 +270,12 @@ struct Run {
 
 /// Runs the pipeline. `progress` gets the share done, from 0 to 1; images take most of it.
 fn optimize(input: &[u8], mut doc: Document, options: &Options, progress: &dyn Fn(f32)) -> Result<Run> {
+    // lopdf reads leniently; a copy written from what it could not read correctly would change
+    // the document without saying so.
+    let lost = damage(input, &doc);
+    if lost > 0 {
+        return Err(Error::Damaged(lost));
+    }
     let mut report = Report { input_bytes: input.len() as u64, ..Report::default() };
     let pages = doc.get_pages().len() as u32;
     report.pages = pages;
@@ -360,6 +371,54 @@ fn renumber(doc: &mut Document) {
         rewrite(v, &map);
     }
     doc.max_id = map.len() as u32;
+}
+
+/// How many parts of the document lopdf did not read faithfully. Each one is a reason to leave
+/// the file unchanged:
+/// - an object the file refers to and lists in its cross-reference table, but that lopdf left
+///   out: it skips an object it cannot parse, and a whole object stream over its size limit;
+/// - an object a later revision deleted, which lopdf kept from an older revision
+///   (see `revisions.rs`), while something still refers to it;
+/// - a stream whose data lopdf could not locate, for a missing or broken `/Length`.
+///
+/// References to objects the file never listed are allowed by the format (they mean null) and
+/// are not counted. Walks with its own stack: nesting in a hostile file is unbounded.
+fn damage(input: &[u8], doc: &Document) -> usize {
+    use lopdf::{xref::XrefEntry, Object};
+    let listed = |id: &ObjectId| match doc.reference_table.entries.get(&id.0) {
+        Some(XrefEntry::Normal { generation, .. }) => u32::from(*generation) == u32::from(id.1),
+        Some(XrefEntry::Compressed { .. }) => id.1 == 0,
+        _ => false,
+    };
+    let deleted = revisions::deleted_objects(input);
+    let mut bad = std::collections::BTreeSet::new();
+    for (id, obj) in &doc.objects {
+        if let Object::Stream(s) = obj {
+            if s.start_position.is_some() && s.content.is_empty() {
+                let length = s.dict.get(b"Length").ok().and_then(|v| doc.dereference(v).ok()).and_then(|(_, v)| v.as_float().ok());
+                if length != Some(0.0) {
+                    bad.insert(*id);
+                }
+            }
+        }
+    }
+    let mut stack: Vec<&Object> = doc.objects.values().collect();
+    stack.extend(doc.trailer.iter().map(|(_, v)| v));
+    while let Some(obj) = stack.pop() {
+        match obj {
+            Object::Reference(id) => {
+                let present = doc.objects.contains_key(id);
+                if (!present && listed(id)) || (present && deleted.contains(&id.0)) {
+                    bad.insert(*id);
+                }
+            }
+            Object::Array(items) => stack.extend(items.iter()),
+            Object::Dictionary(d) => stack.extend(d.iter().map(|(_, v)| v)),
+            Object::Stream(s) => stack.extend(s.dict.iter().map(|(_, v)| v)),
+            _ => {}
+        }
+    }
+    bad.len()
 }
 
 fn load_bounded(bytes: &[u8]) -> lopdf::Result<Document> {

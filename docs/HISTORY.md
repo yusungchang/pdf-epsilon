@@ -9,8 +9,64 @@
 | 0.3.0 | 2026-10-19 | Font optimizer: unused font tables dropped, fully embedded TrueType CID fonts subset. Research on further optimizations. |
 | 0.3.1 | 2026-10-19 | Security hardening against hostile PDFs: bounded decoding everywhere, file size cap, hostile-file tests on all platforms. |
 | 0.4.0 | 2026-10-21 | Analysis progress, page thumbnails and before-and-after page comparison in an isolated renderer, removing files from the list, compact language button, theme button, icon tools for the page list. |
+| 0.6.0 | 2026-10-21 | Update check; damaged files are never half-copied; fuzzing and a public hostile corpus; security and privacy on the website. |
 | 0.5.0 | 2026-10-21 | 0.4.1 released as a minor version at the owner's request; first-launch steps shown on every download; security review. |
 | 0.4.1 | 2026-10-21 | Long file names truncate on every WebKit, a round handle on the comparison divider, glass-finish icon, a product page on GitHub Pages, findings and pages folded under Advanced. |
+
+## 0.6.0, 21 October 2026
+
+The owner asked for an update check, tighter security against known PDF attacks, and the website to say how
+it is tested, with a warmer line about files staying on the computer. Collecting users' email addresses was
+raised and deliberately left for later.
+
+1. **Update check.** A round button beside the theme and language buttons. It checks only when clicked, so
+   nothing goes over the network on its own: it asks `api.github.com` for the newest published release and
+   compares version numbers. A newer version gets a button to the download page; no network gets a calm
+   message and a link. Only a strictly formatted version number is trusted from the reply, and the page it
+   opens is fixed in the app. The Content Security Policy now allows that one host, and the opener plugin
+   may open only the website. Preview: `PREVIEW_UPDATE=0.3.0` pretends to be that version.
+2. **Research.** An agent checked every parsing dependency against RustSec, GitHub advisories and OSV (no
+   match at our versions), surveyed 2018–2026 CVE classes in MuPDF, Poppler, PDFium, pdf.js and qpdf
+   against this design, and listed public hostile corpora. It found three wrong claims in `SECURITY.md`:
+   the app's Flate decoder is `zlib-rs`, not `miniz_oxide` (hayro turns it on); hayro is built with
+   `unsafe` speed-ups and decodes JBIG2, CCITT and JPEG 2000; and the update check is network access.
+   All three are corrected.
+3. **Content-loss guard.** The research pointed at lopdf's lenient loading, and a new test confirmed it: an
+   object with a syntax error was silently dropped and the copy written without it. Running the qpdf
+   corpus with a text comparison then found two more cases: a stream with a missing or garbled `/Length`
+   whose text was lost, and an incremental update that deletes a page's content, which lopdf brought back
+   because it ignores free cross-reference entries. The engine now counts all three before writing (see
+   `damage` in `lib.rs` and the new `revisions.rs`, which reads the classic cross-reference tables along
+   the `/Prev` chain and stops at hybrid sections, whose free entries are placeholders: Word writes
+   thousands). Any of them leaves the file unchanged with a new message, "part of this file is damaged".
+   An early version wrongly refused a real Word report (survey.pdf); stopping at hybrid sections fixed it,
+   and every real test file gives the same savings as before.
+4. **Corpus.** The qpdf test suite (628 PDFs) and 78 qpdf fuzz crashers: no crash, hang or panic; at most
+   440 MB and 0.8 s; 180 cleanly refused (encrypted, unreadable, damaged). Compressed with Balanced, all
+   483 copies have exactly the original's text in MuPDF; before the guard, 3 did not. The renderer on the
+   same files: at most 44 MB and 0.8 s.
+5. **Fuzzing.** `examples/fuzz.rs`, a mutation fuzzer on stable Rust (no nightly here, so no cargo-fuzz):
+   flipped bytes, hostile numbers, PDF tokens, deleted, repeated and spliced ranges, each input analysed
+   with every preset on a 1 MB stack under a 3 GB cap. 200,000 inputs from 954 seeds (the small qpdf
+   files, plain and uncompressed): no panic, hang or crash.
+6. **CI.** `audit.yml` runs `cargo audit` on every push, pull request and weekly; only vulnerabilities fail
+   it (five warnings come from Tauri's Linux window stack, none of which reads PDFs). The test job also
+   runs the hostile tests with `zlib-rs`, the decoder the app ships.
+7. **Minor release routine.** The 19-file hostile corpus: bombs peak at 324 MB, nested forms at 478 MB, the
+   500,000-object file takes 9.0 s and 2.3 GB. All engine tests pass with both Flate decoders.
+8. **Website.** A section, "Tested against the worst PDFs we could find", gives the numbers above and links
+   to `SECURITY.md`. "Private and careful" became "Your files stay home", and the footer says "Your PDFs
+   never leave home." The app screenshots were retaken with the update button.
+9. **Badges.** Seven pills under the download buttons, researched first: there is no standard badge for most
+   of these claims, and the "Not By AI" kind means a work was made without AI, which is not true here (the app
+   contains no AI, but was written with AI help), so none was borrowed. One icon set drawn for the page on a
+   24 px grid with a 1.75 stroke in the same tinted circle, the "no" icons sharing one slash. Each pill is a
+   short label and a light half-line, linking to its proof where there is one. English labels are kept to
+   10–13 characters with the standard terms where they exist: Local only, No AI inside, Stress-tested,
+   CVE-checked, No phone-home, No tracking, Free to use. Korean labels use official, technical words (로컬 처리,
+   AI 미사용, 스트레스 테스트, CVE 점검, 외부 통신 없음, 트래킹 없음, 무상 제공) and the half-lines are the
+   marketing voice (내 파일은 내 컴퓨터에만, 공짜. 진짜 있습니다.). "Free" means free of cost: the code has
+   no license yet. "No tracking" holds only while the site has no analytics.
 
 ## 0.5.0, 21 October 2026
 

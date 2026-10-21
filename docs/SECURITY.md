@@ -11,13 +11,16 @@ macOS, Windows and Linux.
 - **Render it in the app.** Page thumbnails are drawn by a separate copy of the app started
   just for that (see below). The window itself never parses or renders the document.
 - **Extract it.** Attachments and embedded files are never written to disk.
-- **Fetch anything.** Nothing goes over the network; the app has no network permission.
+- **Fetch anything for a PDF.** Nothing in a file can make the app connect anywhere. The app's
+  only network access is the update check, which runs when someone clicks it: it asks
+  `api.github.com` for the newest version number, and the Content Security Policy allows no
+  other host. It sends nothing about any file. The only page it can open is the download page.
 
 ## What a hostile PDF could try, and what stops it
 
 | Attack | Defence |
 |---|---|
-| Memory corruption in the parser or decoders | The whole path is Rust: lopdf, `miniz_oxide` for Flate, `zune-jpeg` for JPEG. There is no C parsing code. |
+| Memory corruption in the parser or decoders | The whole path is Rust: lopdf, `zlib-rs` for Flate in the app (`miniz_oxide` when the engine is built on its own), `zune-jpeg` for JPEG. There is no C parsing code. `zlib-rs` and `zune-jpeg` use `unsafe` for speed, so both decoders are covered by the hostile tests and the fuzz runs below. |
 | Decompression bomb (a small stream that inflates to gigabytes) | Every decode is bounded (see `crates/epsilon/src/limits.rs`). Streams loaded with the document: 256 MB. Page and form content: 64 MB. Fonts: 128 MB. Metadata and glyph maps: 16 MB. Images: never more than their own pixel count. Anything over a limit is left untouched. |
 | Huge predictor rows (`/Columns 2147483647`) | Implausible `/Columns`, `/Colors` and bit depths are refused, by a raw-byte check before loading and again before any decode. |
 | Millions of drawing operations in a short stream | Operations are counted before decoding; over 1 million, the content is treated as unreadable. |
@@ -29,10 +32,11 @@ macOS, Windows and Linux.
 | Files with millions of tiny objects | The object count is estimated from the raw bytes before loading; files estimated at over 1 million are refused. Documents with over 100,000 objects are analysed one preset at a time. |
 | Slow algorithms on large documents | Pruning and renumbering are linear. lopdf's own versions are quadratic: they took 103 s on 500,000 objects, against 2 s now. |
 | Panics | Each preset runs on its own thread, and the app runs work off the main thread, so a panic becomes an error message, not a crash. |
-| Rendering (thumbnails and page comparison) | The renderer (hayro, pure Rust, no `unsafe`) has no limits of its own: in testing, one hostile file made it take 10.9 GB and run past 60 s. So it runs in a separate process, started from the app's own executable with `--render-thumbnails`. That process caps its own heap at 1 GB with a counting allocator, on every platform alike, and the app kills it if a page takes over 8 seconds or a batch over 60. Compressed copies for comparison reach it through a pipe and are never written to disk. A hostile file costs missing pictures, never the app. Measured: the worst attacks now end in under a second at 11–796 MB. |
+| Rendering (thumbnails and page comparison) | The renderer (hayro, pure Rust, built with its `unsafe` speed-ups; it also decodes JBIG2, CCITT, JPEG 2000 and Type 1 fonts, which the engine never does) has no limits of its own: in testing, one hostile file made it take 10.9 GB and run past 60 s. So it runs in a separate process, started from the app's own executable with `--render-thumbnails`. That process caps its own heap at 1 GB with a counting allocator, on every platform alike, and the app kills it if a page takes over 12 seconds or a batch over 60. Compressed copies for comparison reach it through a pipe and are never written to disk. A hostile file costs missing pictures, never the app. Measured: the worst attacks now end in under a second at 11–796 MB. |
 | Text from the file in the interface (font names, producer, attachment names) | Always inserted as text (`textContent`), never as HTML. The Content Security Policy allows only the app's own scripts. |
 | Overwriting files | Output is created with `create_new` as `<name>-epsilon.pdf`. An existing file or symlink is never replaced. |
 | Encrypted files decrypted silently | Refused, by a raw-byte check as well as lopdf's flags. |
+| Content lost or brought back by a lenient reader | lopdf reads damaged files leniently, and a copy saved from what it misread would change the document without saying so. Before writing, the engine counts three cases: an object the file lists and refers to that lopdf skipped (a syntax error, or an object stream over its limit); an object a later revision deleted that lopdf kept from an older one (lopdf ignores free entries, so the engine reads the cross-reference tables itself, see `revisions.rs`), while something still refers to it; and a stream whose data lopdf could not locate. Any of them leaves the file unchanged, with the message that part of it is damaged. On the qpdf test suite this guards 19 damaged files and an incremental update that deletes a page's content. |
 
 With these limits, the hostile files measured peaked at 477 MB of memory (20,000 nested
 forms), whether their bombs held 512 MB or 2 GB. Before them, a 12 KB file took 7.4 GB.
@@ -55,7 +59,17 @@ A legitimate 46 MB file with 500,000 objects takes 2 GB and 9 seconds.
   than any platform's default. CI runs it on macOS, Windows and Linux on every push.
 - Unit tests in `limits.rs` check each bound directly.
 - A larger corpus of 19 files, with 2 GB bombs and a 500,000-object file, was run by hand on
-  19 October 2026 and again for 0.4.0 and 0.5.0, measuring time and peak memory (see `HISTORY.md`).
+  19 October 2026 and again for 0.4.0, 0.5.0 and 0.6.0, measuring time and peak memory (see `HISTORY.md`).
+- The qpdf test suite (628 PDFs, many deliberately broken) and 78 files that once crashed qpdf
+  under fuzzing are run through the analysis, every preset and the renderer. Every compressed
+  copy's text is compared with the original's by MuPDF. For 0.6.0: no crash or hang, 440 MB at
+  most, and identical text in all 483 copies written.
+- `examples/fuzz.rs` damages seed PDFs at random and runs the whole analysis on each, on a
+  1 MB stack under a 3 GB memory cap, recording panics, hangs and crashes. It runs on stable
+  Rust. For 0.6.0: 200,000 inputs from the qpdf seeds, uncompressed with `mutool clean -d`,
+  with no finding.
+- `.github/workflows/audit.yml` checks every dependency against the RustSec advisory database
+  on every push and weekly. CI also runs the hostile tests with the Flate decoder the app ships.
 
 To report a security problem, open an issue at <https://github.com/yusungchang/pdf-epsilon/issues>
 without attaching the hostile file, and say how to reach you.

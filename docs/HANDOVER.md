@@ -138,8 +138,9 @@ so `v0.4.0` is the first release to include it.
 
 ## Next steps
 
-1. **Publish v0.5.0.** The tag builds a draft release; publishing it makes the website's buttons point at it.
-   Donations (GitHub Sponsors, Ko-fi, toss.me) were discussed and not built yet.
+1. **Owner decisions pending.** Email contact with users (optional, never required) was raised for 0.6.0 and
+   left for later. Donations (GitHub Sponsors, Ko-fi, toss.me) were discussed and not built yet.
+   Report the lopdf free-entry bug upstream (see HISTORY 0.6.0, item 3) once the owner agrees.
 2. **Owner decisions.** Choose a license, register the domain, and decide on code signing. Signing needs an Apple Developer
    account for macOS and a certificate for Windows.
 3. **Engine improvements,** in the order recommended by `reports/PDF size optimization techniques.md` (19 October 2026):

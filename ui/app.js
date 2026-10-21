@@ -1107,6 +1107,7 @@ function renderLanguagePicker() {
       save("language", code);
       label();
       renderThemePicker.relabel?.();
+      renderUpdate.relabel?.();
       renderSettings();
       renderFiles();
       renderReport();
@@ -1140,6 +1141,7 @@ const ICONS = {
   system: ["M2 3h12v8H2z", "M6 14h4", "M8 11v3"],
   light: ["M8 5.2a2.8 2.8 0 1 0 0 5.6a2.8 2.8 0 1 0 0-5.6", "M8 1.5v1.5", "M8 13v1.5", "M1.5 8H3", "M13 8h1.5", "M3.4 3.4l1 1", "M11.6 11.6l1 1", "M3.4 12.6l1-1", "M11.6 4.4l1-1"],
   dark: ["M13 9.5A5.5 5.5 0 1 1 6.5 3a4.5 4.5 0 0 0 6.5 6.5Z"],
+  update: ["M13.2 6A5.5 5.5 0 1 0 13.5 8", "M13.5 2.5V6H10"],
 };
 
 // ---- theme: System (the default) follows the operating system; Light and Dark override it ----
@@ -1156,7 +1158,7 @@ function applyTheme(theme) {
 }
 
 function closeMenus() {
-  for (const [b, m] of [["theme", "theme-menu"], ["language", "language-menu"]]) {
+  for (const [b, m] of [["update", "update-menu"], ["theme", "theme-menu"], ["language", "language-menu"]]) {
     $(m).hidden = true;
     $(b).setAttribute("aria-expanded", "false");
   }
@@ -1202,6 +1204,75 @@ function renderThemePicker() {
   renderThemePicker.relabel = label;
 }
 
+// ---- update check: only when asked, and only the version number goes back and forth ----
+
+const SITE = "https://yusungchang.github.io/pdf-epsilon/";
+const LATEST = "https://api.github.com/repos/yusungchang/pdf-epsilon/releases/latest";
+
+// "v1.2.3" or "1.2.3" to [1, 2, 3]; anything else is not trusted.
+function parseVersion(v) {
+  const m = /^v?(\d{1,4})\.(\d{1,4})\.(\d{1,4})$/.exec(String(v || "").trim());
+  return m ? m.slice(1).map(Number) : null;
+}
+function newer(a, b) {
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i];
+  return false;
+}
+
+// The newest published release, or null when GitHub cannot be reached.
+async function latestVersion() {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 8000);
+  try {
+    const r = await fetch(LATEST, { signal: ctl.signal, headers: { Accept: "application/vnd.github+json" }, credentials: "omit", referrerPolicy: "no-referrer" });
+    if (!r.ok) return null;
+    return parseVersion((await r.json()).tag_name);
+  } catch { return null; } finally { clearTimeout(timer); }
+}
+
+function renderUpdate() {
+  const button = $("update");
+  const menu = $("update-menu");
+  let mine = null;
+  const label = () => {
+    button.replaceChildren(icon("update"));
+    button.setAttribute("aria-label", t("update.label"));
+    button.title = t("update.label");
+  };
+  const show = (...lines) => menu.replaceChildren(
+    el("p", "update-version", t("update.current", { version: mine ? mine.join(".") : "?" })),
+    ...lines,
+    el("p", "update-note", t("update.privacy")));
+  const siteButton = (primary) => {
+    const b = el("button", primary ? "primary" : "link", t("update.download"));
+    b.type = "button";
+    b.onclick = () => { window.__TAURI__.opener.openUrl(SITE).catch(() => {}); closeMenus(); };
+    return b;
+  };
+  async function check() {
+    show(el("p", "update-status", t("update.checking")));
+    if (!mine) mine = parseVersion(await window.__TAURI__.app.getVersion().catch(() => ""));
+    const latest = await latestVersion();
+    if (menu.hidden) return;
+    if (!latest || !mine) show(el("p", "update-status", t("update.failed")), siteButton(false));
+    else if (newer(latest, mine)) show(el("p", "update-status new", t("update.available", { version: latest.join(".") })), siteButton(true));
+    else show(el("p", "update-status", t("update.latest")));
+  }
+  label();
+  button.onclick = (e) => {
+    e.stopPropagation();
+    const opening = menu.hidden;
+    closeMenus();
+    if (opening) {
+      menu.hidden = false;
+      button.setAttribute("aria-expanded", "true");
+      check();
+    }
+  };
+  menu.addEventListener("click", (e) => e.stopPropagation());
+  renderUpdate.relabel = label;
+}
+
 function icon(name, cls = "icon") {
   const ns = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(ns, "svg");
@@ -1220,6 +1291,7 @@ const globe = () => icon("globe", "globe");
 
 async function init() {
   await setLanguage(pickLanguage());
+  renderUpdate();
   renderThemePicker();
   renderLanguagePicker();
   for (const p of await invoke("presets")) state.presets[p.id] = p.options;

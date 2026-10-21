@@ -34,6 +34,10 @@ jobs:
         with:
           workspaces: ". -> target.nosync"
       - run: cargo test -p epsilon --release
+      # The app builds flate2 with zlib-rs (hayro turns it on); the engine alone uses miniz_oxide.
+      # Run the hostile files through the decoder that ships too.
+      - name: Hostile files with the app's Flate decoder
+        run: cargo test -p epsilon --release --features flate2/zlib-rs --test hostile
 
   bundle:
     if: github.event_name != 'pull_request'

@@ -68,7 +68,9 @@ Source: <https://github.com/yusungchang/pdf-epsilon>.
 
 Text, fonts, vector drawing, links, bookmarks, forms, annotations and attachments are
 kept. Every result is re-opened and its page count checked before it is saved. If the
-result is not smaller, nothing is written.
+result is not smaller, nothing is written. A file that is partly damaged is never rewritten from a guess: it is left as it
+is. **Check for updates** (the round arrow in the header) asks GitHub for the newest version
+number only when clicked; nothing about any file is ever sent.
 
 ## Presets
 
@@ -107,6 +109,7 @@ Try the engine on a file without the app:
 ```sh
 cargo run -p epsilon --release --example inspect -- in.pdf --pages   # analysis, add --json for raw
 cargo run -p epsilon --release --example squeeze -- in.pdf out.pdf balanced
+cargo run -p epsilon --release --example fuzz -- out/ 20000 1 seeds/*.pdf   # mutation fuzzing, see docs/SECURITY.md
 ```
 
 ## Layout

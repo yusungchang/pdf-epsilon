@@ -1,13 +1,23 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What the main window may do: pick files and folders, ask before saving a signed file, follow the chosen theme, and show results in the file manager.",
-  "windows": ["main"],
+  "description": "What the main window may do: pick files and folders, ask before saving a signed file, follow the chosen theme, show results in the file manager, and open the download page.",
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
     "core:window:allow-set-theme",
     "dialog:allow-open",
     "dialog:allow-ask",
-    "opener:allow-reveal-item-in-dir"
+    "opener:allow-reveal-item-in-dir",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "https://yusungchang.github.io/pdf-epsilon/*"
+        }
+      ]
+    }
   ]
 }

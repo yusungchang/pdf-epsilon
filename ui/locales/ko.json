@@ -1,6 +1,14 @@
 {
   "language.label": "언어",
 
+  "update.label": "업데이트 확인",
+  "update.current": "지금 버전은 {version}입니다.",
+  "update.checking": "확인하는 중…",
+  "update.latest": "최신 버전입니다.",
+  "update.available": "새 버전({version})이 나왔습니다.",
+  "update.download": "다운로드 페이지 열기",
+  "update.failed": "GitHub에 연결하지 못했습니다. 인터넷 연결을 확인하거나 웹사이트를 방문해 주세요.",
+  "update.privacy": "버전 번호만 비교합니다. 파일은 이 컴퓨터에 그대로 있습니다.",
   "theme.label": "테마",
   "theme.system": "시스템 설정",
   "theme.light": "밝게",
@@ -276,6 +284,7 @@
   "error.tooLarge": "PDF Epsilon이 처리하기엔 파일이 너무 큽니다(2GB 초과).",
   "error.tooComplex": "파일의 구성 요소가 너무 많아 PDF Epsilon이 안전하게 처리할 수 없습니다(개체 100만 개 초과).",
   "error.verify": "작아진 파일이 검증을 통과하지 못해 아무것도 저장하지 않았습니다. 원본은 그대로입니다.",
+  "error.damaged": "파일 일부가 손상되어 있어 PDF Epsilon이 바꾸지 않습니다. 원본은 그대로입니다.",
   "error.internal": "PDF Epsilon 내부에서 문제가 생겼습니다.",
   "error.start": "시작하지 못했습니다: {detail}"
 }

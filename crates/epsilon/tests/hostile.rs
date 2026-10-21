@@ -154,3 +154,37 @@ fn hostile_files_finish_quickly_on_a_small_stack() {
     let slow = worker.join().expect("a hostile file crashed the worker");
     assert!(slow.is_empty(), "too slow: {slow:?}");
 }
+
+/// lopdf reads leniently: an object it cannot parse, or an object stream over the size limit, is
+/// left out of the document instead of failing the load. Saving that document would quietly drop
+/// a font or an annotation while every page is still there. Such files must not be written.
+#[test]
+fn objects_lopdf_cannot_read_are_never_silently_dropped() {
+    let font_used = b"BT /F1 24 Tf 72 700 Td (Hello) Tj ET";
+    let cases = [
+        ("font object with a syntax error", pdf("/Font << /F1 5 0 R >>", stream("", font_used), "", vec![b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica ]] >>".to_vec()])),
+        ("content stream without a length", {
+            let mut b = pdf("/Font << /F1 5 0 R >>", stream("", font_used), "", vec![b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_vec()]);
+            let at = b.windows(8).position(|w| w == b"/Length ").unwrap();
+            b[at + 1] = b'Q';
+            b
+        }),
+        ("content deleted by a later revision", {
+            let mut b = pdf("/Font << /F1 5 0 R >>", stream("", font_used), "", vec![b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_vec()]);
+            let prev = String::from_utf8_lossy(&b).rfind("startxref\n").map(|i| {
+                let t = String::from_utf8_lossy(&b[i + 10..]).to_string();
+                t.lines().next().unwrap().to_string()
+            }).unwrap();
+            let at = b.len();
+            b.extend_from_slice(format!("xref\n4 1\n0000000000 00001 f \ntrailer\n<< /Size 6 /Root 1 0 R /Prev {prev} >>\nstartxref\n{at}\n%%EOF\n").as_bytes());
+            b
+        }),
+        ("font inside an object stream over its limit", pdf("/Font << /F1 5 0 R >>", stream("", font_used), "", vec![stream("/Type /ObjStm /N 1 /First 4 /Filter /FlateDecode", &zeros(257 << 20))])),
+    ];
+    for (name, bytes) in cases {
+        if let Ok((out, report)) = compress_bytes(&bytes, &Preset::Balanced.options()) {
+            // Keeping the original untouched is fine; writing a copy without the object is not.
+            assert!(report.kept_original || out == bytes, "{name}: wrote a copy that lost an object");
+        }
+    }
+}

@@ -4,7 +4,8 @@
 # engine (the inspect example) and their reports are shown; a fake encrypted file is added.
 # The page is served over a local web server, because the interface fetches its language file.
 # Thumbnails come from the app's own renderer process and one image comparison from the engine.
-# Usage: [PREVIEW_OPEN=1] [PREVIEW_CLEAN=1] [PREVIEW_SCALE=2] [PREVIEW_LANG=ko] [PREVIEW_COMPARE=page|diff|diff4] [PREVIEW_SLOW=1] tools/ui-preview/preview.sh out.png [light|dark] [height] file.pdf...
+# PREVIEW_UPDATE=0.3.0 pretends to be that version and opens the update check (it asks GitHub for real).
+# Usage: [PREVIEW_UPDATE=x.y.z] [PREVIEW_OPEN=1] [PREVIEW_CLEAN=1] [PREVIEW_SCALE=2] [PREVIEW_LANG=ko] [PREVIEW_COMPARE=page|diff|diff4] [PREVIEW_SLOW=1] tools/ui-preview/preview.sh out.png [light|dark] [height] file.pdf...
 set -e
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
@@ -28,6 +29,7 @@ printf '};\n' >> "$work/analyses.js"
 printf 'window.__THEME__ = "%s";\n' "$scheme" >> "$work/analyses.js"
 [ -n "$PREVIEW_COMPARE" ] && printf 'window.__COMPARE__ = "%s";\n' "$PREVIEW_COMPARE" >> "$work/analyses.js"
 [ -n "$PREVIEW_SLOW" ] && printf 'window.__SLOW__ = true;\n' >> "$work/analyses.js"
+[ -n "$PREVIEW_UPDATE" ] && printf 'window.__VERSION__ = "%s"; window.__UPDATE__ = true;\n' "$PREVIEW_UPDATE" >> "$work/analyses.js"
 [ -n "$PREVIEW_OPEN" ] && printf 'try { localStorage.setItem("moreOpen", "true"); } catch {}\n' >> "$work/analyses.js"
 [ -n "$PREVIEW_CLEAN" ] && printf 'window.__CLEAN__ = true;\n' >> "$work/analyses.js"
 (cd "$root" && cargo build -q -p epsilon --release --example squeeze)

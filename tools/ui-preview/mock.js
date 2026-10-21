@@ -49,7 +49,8 @@ window.__TAURI__ = {
     }
   } },
   dialog: { open: async () => null, ask: async () => true },
-  opener: { revealItemInDir: async () => {} },
+  opener: { revealItemInDir: async () => {}, openUrl: async () => {} },
+  app: { getVersion: async () => window.__VERSION__ || "0.6.0" },
   webview: { getCurrentWebview: () => ({ onDragDropEvent: async () => {} }) },
 };
 setTimeout(async () => {
@@ -58,6 +59,7 @@ setTimeout(async () => {
   addFiles([...names.map((n) => `/x/${n}`), ...(window.__CLEAN__ ? [] : ["/x/locked-report.pdf"])]);
   await new Promise((r) => setTimeout(r, 600));
   select(0);
+  if (window.__UPDATE__) document.getElementById("update").click();
   if (window.__SAVE__) await saveCopy();
   if (window.__COMPARE__) {
     // Page 2, or with differences shown for PREVIEW_COMPARE=diff.

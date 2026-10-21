@@ -1,0 +1,23 @@
+name: audit
+
+# Checks every dependency in Cargo.lock against the RustSec advisory database: on every push
+# and pull request, and weekly, since new advisories appear without any change here.
+# Only vulnerabilities fail the run. The warnings about unmaintained or unsound crates come from
+# the Linux window stack Tauri uses (glib, zbus); none of them reads PDF data.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - run: cargo audit
