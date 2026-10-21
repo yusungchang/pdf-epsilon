@@ -9,7 +9,25 @@
 | 0.3.0 | 2026-10-19 | Font optimizer: unused font tables dropped, fully embedded TrueType CID fonts subset. Research on further optimizations. |
 | 0.3.1 | 2026-10-19 | Security hardening against hostile PDFs: bounded decoding everywhere, file size cap, hostile-file tests on all platforms. |
 | 0.4.0 | 2026-10-21 | Analysis progress, page thumbnails and before-and-after page comparison in an isolated renderer, removing files from the list, compact language button, theme button, icon tools for the page list. |
+| 0.5.0 | 2026-10-21 | 0.4.1 released as a minor version at the owner's request; first-launch steps shown on every download; security review. |
 | 0.4.1 | 2026-10-21 | Long file names truncate on every WebKit, a round handle on the comparison divider, glass-finish icon, a product page on GitHub Pages, findings and pages folded under Advanced. |
+
+## 0.5.0, 21 October 2026
+
+The owner asked to make the 0.4.1 work downloadable. z versions are not tagged, so it became 0.5.0, with the
+minor release routine.
+
+1. **First-launch steps.** Visitors who clicked the top download button never saw how to get past macOS
+   Gatekeeper or Windows SmartScreen: the steps were folded away in each download card. They are now a short
+   numbered list in every card, and any download link also opens a small window, "Your download has started",
+   with the steps for that system. The download itself starts as before.
+2. **Security review.** The engine's parsing code did not change since 0.4.0, so there is no new path to add
+   to `tests/hostile.rs`. All engine tests pass. The 19-file corpus was rerun by hand: every hostile file
+   peaks at 446 MB or less, the legitimate 500,000-object file takes 9.3 s and 2.2 GB, and the two files with
+   absurd predictor parameters are refused, all as in 0.4.0. The isolated renderer on the same corpus: the
+   worst attacks end at its 1 GB cap in under 1.2 s, at 796 MB at most.
+3. **Release.** `v0.5.0` is the first tag to run the new release steps: fixed-name installers for the website
+   and the full Mac signature check.
 
 ## 0.4.1, 21 October 2026
 

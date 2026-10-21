@@ -102,30 +102,40 @@
           <a class="button primary" href="https://github.com/yusungchang/pdf-epsilon/releases/latest/download/PDF-Epsilon-macOS-AppleSilicon.dmg" data-t="dl.macArm">Apple silicon (M1 and later)</a>
           <a class="button" href="https://github.com/yusungchang/pdf-epsilon/releases/latest/download/PDF-Epsilon-macOS-Intel.dmg" data-t="dl.macIntel">Intel</a>
           <p class="note" data-t="dl.macWhich">Apple menu → About This Mac: “Chip” is Apple silicon, “Processor” is Intel.</p>
-          <details>
-            <summary data-t="first.title">First launch</summary>
-            <p data-t="first.mac">Move it to Applications and open it. If macOS can’t verify it, go to System Settings → Privacy &amp; Security → Open Anyway. Only once.</p>
-          </details>
+          <div class="steps" data-os="mac">
+            <h4 data-t="first.title">First launch</h4>
+            <ol>
+              <li data-t="first.mac1">Open the .dmg and drag PDF Epsilon to Applications.</li>
+              <li data-t="first.mac2">Open it. When macOS says it can’t verify the app, click Done.</li>
+              <li data-t="first.mac3">Go to System Settings → Privacy &amp; Security, scroll down and click <b>Open Anyway</b>. Only the first time.</li>
+            </ol>
+          </div>
         </article>
         <article id="windows">
           <h3>Windows</h3>
           <a class="button primary" href="https://github.com/yusungchang/pdf-epsilon/releases/latest/download/PDF-Epsilon-Windows-Setup.exe" data-t="dl.winSetup">Installer (.exe)</a>
           <a class="button" href="https://github.com/yusungchang/pdf-epsilon/releases/latest/download/PDF-Epsilon-Windows.msi" data-t="dl.winMsi">MSI package</a>
           <p class="note" data-t="dl.winNote">Windows 10 and 11, 64-bit.</p>
-          <details>
-            <summary data-t="first.title">First launch</summary>
-            <p data-t="first.win">If SmartScreen appears, click More info, then Run anyway.</p>
-          </details>
+          <div class="steps" data-os="windows">
+            <h4 data-t="first.title">First launch</h4>
+            <ol>
+              <li data-t="first.win1">Run the installer.</li>
+              <li data-t="first.win2">If “Windows protected your PC” appears, click <b>More info</b>, then <b>Run anyway</b>.</li>
+            </ol>
+          </div>
         </article>
         <article id="linux">
           <h3>Linux</h3>
           <a class="button primary" href="https://github.com/yusungchang/pdf-epsilon/releases/latest/download/PDF-Epsilon-Linux.deb" data-t="dl.deb">Debian, Ubuntu, Mint (.deb)</a>
           <a class="button" href="https://github.com/yusungchang/pdf-epsilon/releases/latest/download/PDF-Epsilon-Linux.AppImage">AppImage</a>
           <a class="button" href="https://github.com/yusungchang/pdf-epsilon/releases/latest/download/PDF-Epsilon-Linux.rpm" data-t="dl.rpm">Fedora (.rpm)</a>
-          <details>
-            <summary data-t="first.title">First launch</summary>
-            <p data-t="first.linux">For the .deb, run <code>sudo apt install ./PDF-Epsilon-Linux.deb</code> in the folder you downloaded it to. For the AppImage, run <code>chmod +x PDF-Epsilon-Linux.AppImage</code>, then open it.</p>
-          </details>
+          <div class="steps" data-os="linux">
+            <h4 data-t="first.title">First launch</h4>
+            <ol>
+              <li data-t="first.linux1">.deb: <code>sudo apt install ./PDF-Epsilon-Linux.deb</code></li>
+              <li data-t="first.linux2">AppImage: <code>chmod +x PDF-Epsilon-Linux.AppImage</code>, then open it.</li>
+            </ol>
+          </div>
         </article>
       </div>
       <p class="all"><a href="https://github.com/yusungchang/pdf-epsilon/releases" data-t="download.all">All versions and release notes</a></p>
@@ -136,6 +146,14 @@
     <p><span data-t="footer.text">PDF Epsilon runs entirely on your computer.</span> · <a href="https://github.com/yusungchang/pdf-epsilon" data-t="footer.source">Source on GitHub</a> · <a href="https://github.com/yusungchang/pdf-epsilon/issues/new/choose" data-t="footer.bug">Report a bug</a></p>
     <p class="author"><span data-t="footer.author">Made by</span> <a href="https://www.linkedin.com/in/yusungchang/" rel="author">yusungchang</a> · © 2026</p>
   </footer>
+
+  <!-- Shown after any download link is clicked: the download starts, and this says what comes next. -->
+  <dialog id="after" class="after">
+    <h3 data-t="after.title">Your download has started</h3>
+    <p class="sub-left" data-t="after.text">The app isn’t signed with a paid certificate yet, so the first time you open it:</p>
+    <div id="after-steps"></div>
+    <form method="dialog"><button class="button primary" data-t="after.close">Got it</button></form>
+  </dialog>
 
   <script src="site.js"></script>
 </body>

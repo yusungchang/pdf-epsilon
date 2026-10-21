@@ -47,6 +47,16 @@ const KO = {
   "first.mac": "응용 프로그램 폴더로 옮긴 뒤 여세요. 확인할 수 없다는 안내가 뜨면 시스템 설정 → 개인정보 보호 및 보안 → ‘그래도 열기’. 처음 한 번만입니다.",
   "first.win": "‘Windows의 PC 보호’ 창이 뜨면 ‘추가 정보’ → ‘실행’을 누르세요.",
   "first.linux": ".deb는 받은 폴더에서 <code>sudo apt install ./PDF-Epsilon-Linux.deb</code>를 실행하세요. AppImage는 <code>chmod +x PDF-Epsilon-Linux.AppImage</code>를 실행한 다음 여세요.",
+  "first.mac1": ".dmg를 열고 PDF Epsilon을 응용 프로그램 폴더로 끌어 놓으세요.",
+  "first.mac2": "앱을 여세요. 확인할 수 없다는 창이 뜨면 ‘완료’를 누르세요.",
+  "first.mac3": "시스템 설정 → 개인정보 보호 및 보안에서 아래로 내려 <b>그래도 열기</b>를 누르세요. 처음 한 번만입니다.",
+  "first.win1": "설치 프로그램을 실행하세요.",
+  "first.win2": "‘Windows의 PC 보호’ 창이 뜨면 <b>추가 정보</b> → <b>실행</b>을 누르세요.",
+  "first.linux1": ".deb: <code>sudo apt install ./PDF-Epsilon-Linux.deb</code>",
+  "first.linux2": "AppImage: <code>chmod +x PDF-Epsilon-Linux.AppImage</code> 실행 후 여세요.",
+  "after.title": "다운로드가 시작됐습니다",
+  "after.text": "아직 유료 인증서로 서명하지 않아서, 처음 열 때만 이렇게 해 주세요.",
+  "after.close": "확인",
   "download.all": "모든 버전과 릴리스 노트",
   "footer.text": "PDF Epsilon은 모든 작업을 내 컴퓨터에서 합니다.",
   "footer.source": "GitHub의 소스 코드",
@@ -112,6 +122,24 @@ async function showVersion() {
     el.hidden = false;
   } catch { /* offline or rate limited: the page works without it */ }
 }
+
+// Any download link: let the download start, then show the first-launch steps for that system.
+// The steps are copied from the download card, so they are already in the visitor's language.
+// One listener for the page, because the top button only gets its download link after load.
+document.addEventListener("click", (e) => {
+  const a = e.target.closest?.('a[href*="/releases/latest/download/"]');
+  if (!a) return;
+  const n = a.href.split("/").pop();
+  const os = n.includes("macOS") ? "mac" : n.includes("Windows") ? "windows" : "linux";
+  const steps = document.querySelector(`.steps[data-os="${os}"] ol`);
+  const dialog = document.getElementById("after");
+  if (!steps || !dialog.showModal) return;
+  document.getElementById("after-steps").replaceChildren(steps.cloneNode(true));
+  dialog.showModal();
+});
+document.getElementById("after").addEventListener("click", (e) => {
+  if (e.target === e.currentTarget) e.currentTarget.close();
+});
 
 document.getElementById("lang").addEventListener("click", () => setLanguage(document.documentElement.lang === "ko" ? "en" : "ko"));
 

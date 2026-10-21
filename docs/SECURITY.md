@@ -55,7 +55,7 @@ A legitimate 46 MB file with 500,000 objects takes 2 GB and 9 seconds.
   than any platform's default. CI runs it on macOS, Windows and Linux on every push.
 - Unit tests in `limits.rs` check each bound directly.
 - A larger corpus of 19 files, with 2 GB bombs and a 500,000-object file, was run by hand on
-  19 October 2026, measuring time and peak memory (see `HISTORY.md`).
+  19 October 2026 and again for 0.4.0 and 0.5.0, measuring time and peak memory (see `HISTORY.md`).
 
 To report a security problem, open an issue at <https://github.com/yusungchang/pdf-epsilon/issues>
 without attaching the hostile file, and say how to reach you.
