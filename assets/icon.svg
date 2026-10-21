@@ -1,10 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <!-- The artwork (icon-art.png) clipped to the macOS app icon shape: an 824 px rounded square
-       centred on a 1024 px canvas, as Apple's icon grid expects. -->
+  <!-- The artwork clipped to the macOS rounded square, with a baked-in glass finish:
+       a light rim (brightest at the top), a sheen over the upper part, and a darker lower edge. -->
   <defs>
-    <clipPath id="shape">
-      <rect x="100" y="100" width="824" height="824" rx="185" ry="185"/>
-    </clipPath>
+    <clipPath id="shape"><rect x="100" y="100" width="824" height="824" rx="185" ry="185"/></clipPath>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".6"/>
+      <stop offset=".3" stop-color="#fff" stop-opacity=".14"/>
+      <stop offset=".75" stop-color="#fff" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#fff" stop-opacity=".28"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".16"/>
+      <stop offset=".55" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="depth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset=".7" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity=".22"/>
+    </linearGradient>
   </defs>
-  <image href="icon-art.png" xlink:href="icon-art.png" x="100" y="100" width="824" height="824" clip-path="url(#shape)" preserveAspectRatio="xMidYMid slice"/>
+  <g clip-path="url(#shape)">
+    <image href="icon-art.png" xlink:href="icon-art.png" x="100" y="100" width="824" height="824" preserveAspectRatio="xMidYMid slice"/>
+    <rect x="100" y="100" width="824" height="824" fill="url(#depth)"/>
+    <rect x="100" y="100" width="824" height="824" fill="url(#sheen)"/>
+  </g>
+  <rect x="104" y="104" width="816" height="816" rx="181" ry="181" fill="none" stroke="url(#rim)" stroke-width="6"/>
+  <rect x="100.5" y="100.5" width="823" height="823" rx="185" ry="185" fill="none" stroke="#000" stroke-opacity=".25" stroke-width="1.5"/>
 </svg>

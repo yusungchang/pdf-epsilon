@@ -551,6 +551,10 @@ function jumpToPage(n) {
   document.querySelector(`[data-page="${n}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
+// "Advanced" below the save button: closed by default, remembered between launches.
+$("more").open = load("moreOpen", false) === true;
+$("more").addEventListener("toggle", () => save("moreOpen", $("more").open));
+
 // Thumbnails are rendered on demand, for rows that scroll into view, in a separate process.
 const thumbObserver = new IntersectionObserver((entries) => {
   const f = state.files[state.current];
@@ -871,6 +875,7 @@ async function openCompare(f, page) {
     scroller.replaceChildren(waiting);
     scroller.className = `cmp-stage ${view.diff ? "diff" : view.mode}`;
     view.recentreDivider = null;
+    view.placeKnob = null;
     scroller.style.setProperty("--zoom", view.zoom);
     // Render at the size the page will be shown, so it is sharp but no larger than needed.
     view.aspect = view.aspect || (p.width > 0 && p.height > 0 ? p.width / p.height : 0.75);
@@ -924,6 +929,10 @@ async function openCompare(f, page) {
       top.style.clipPath = `inset(0 0 0 ${view.split}%)`;
       const line = el("div", "cmp-line");
       line.style.left = `${view.split}%`;
+      // A round handle on the divider, kept at the vertical middle of what is visible.
+      const knob = el("div", "cmp-knob");
+      knob.append(icon("drag"));
+      knob.style.left = `${view.split}%`;
       const slider = el("input", "cmp-slider");
       Object.assign(slider, { type: "range", min: 0, max: 100, value: view.split });
       slider.setAttribute("aria-label", t("compare.hint"));
@@ -931,7 +940,15 @@ async function openCompare(f, page) {
         view.split = Math.max(0, Math.min(100, v));
         top.style.clipPath = `inset(0 0 0 ${view.split}%)`;
         line.style.left = `${view.split}%`;
+        knob.style.left = `${view.split}%`;
         slider.value = view.split;
+      };
+      view.placeKnob = () => {
+        // The middle of the part of the page in view: the page's own middle when all of it shows.
+        const top = Math.max(scroller.scrollTop, fr.offsetTop);
+        const bottom = Math.min(scroller.scrollTop + scroller.clientHeight, fr.offsetTop + fr.clientHeight);
+        const middle = (top + bottom) / 2 - fr.offsetTop;
+        knob.style.top = `${Math.max(20, Math.min(fr.clientHeight - 20, middle))}px`;
       };
       slider.oninput = () => setSplit(Number(slider.value));
       view.recentreDivider = () => {
@@ -943,7 +960,7 @@ async function openCompare(f, page) {
         }
       };
       fr.prepend(image(before, "cmp-base", t("compare.original")), top);
-      fr.append(line, slider);
+      fr.append(line, knob, slider);
       // Which side is which, pinned to the visible corners while zoomed and scrolled.
       const tags = el("div", "cmp-tags");
       tags.append(el("span", "cmp-tag", t("compare.original")), el("span", "cmp-tag", settingsLabel()));
@@ -959,6 +976,7 @@ async function openCompare(f, page) {
       scroller.replaceChildren(side(before, t("compare.original")), side(after, settingsLabel()));
     }
     layout();
+    requestAnimationFrame(() => view.placeKnob?.());
     if (view.recentre) {
       view.recentre = false;
       requestAnimationFrame(() => {
@@ -993,11 +1011,12 @@ async function openCompare(f, page) {
   let scrollFrame = 0;
   scroller.addEventListener("scroll", () => {
     cancelAnimationFrame(scrollFrame);
-    scrollFrame = requestAnimationFrame(() => view.recentreDivider?.());
+    scrollFrame = requestAnimationFrame(() => { view.recentreDivider?.(); view.placeKnob?.(); });
   }, { passive: true });
 
   const resizeWatch = new ResizeObserver(() => {
     layout();
+    view.placeKnob?.();
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
       if (dlg.open && view.drawnFor && fitWidth() > view.drawnFor * 1.25) draw();
@@ -1117,6 +1136,7 @@ const ICONS = {
   expand: ["M4.5 6.5L8 3l3.5 3.5", "M4.5 9.5L8 13l3.5-3.5"],
   collapse: ["M4.5 2.5L8 6l3.5-3.5", "M4.5 13.5L8 10l3.5 3.5"],
   compare: ["M2 3.5h12v9H2z", "M8 2v12", "M4 6.5h2", "M10 9.5h2"],
+  drag: ["M6 4.5L2.5 8L6 11.5", "M10 4.5L13.5 8L10 11.5"],
   system: ["M2 3h12v8H2z", "M6 14h4", "M8 11v3"],
   light: ["M8 5.2a2.8 2.8 0 1 0 0 5.6a2.8 2.8 0 1 0 0-5.6", "M8 1.5v1.5", "M8 13v1.5", "M1.5 8H3", "M13 8h1.5", "M3.4 3.4l1 1", "M11.6 11.6l1 1", "M3.4 12.6l1-1", "M11.6 4.4l1-1"],
   dark: ["M13 9.5A5.5 5.5 0 1 1 6.5 3a4.5 4.5 0 0 0 6.5 6.5Z"],

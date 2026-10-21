@@ -3,6 +3,7 @@ name = "pdf-epsilon"
 description = "Make PDFs smaller. Keep what matters."
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
 license.workspace = true
 homepage.workspace = true
 

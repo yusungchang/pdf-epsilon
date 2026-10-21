@@ -1,0 +1,61 @@
+name: Bug report · 버그 신고
+description: Something went wrong, looks wrong, or a file came out worse. · 문제가 생겼거나, 결과가 이상할 때.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time. Issues here are **public**: please don't attach a PDF that is private or confidential.
+        시간 내 주셔서 고맙습니다. 이 게시판은 **공개**됩니다. 개인적이거나 민감한 PDF는 첨부하지 말아 주세요.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened? · 무슨 일이 있었나요?
+      description: What you did, what you expected, and what you saw instead. Screenshots help. · 무엇을 했고, 어떻게 되길 기대했고, 실제로는 어땠는지 적어 주세요. 스크린숏이 있으면 큰 도움이 됩니다.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version · 앱 버전
+      description: "On the download page or in the installer name, e.g. 0.4.0. · 다운로드 페이지나 설치 파일 이름에 있습니다. 예: 0.4.0"
+      placeholder: "0.4.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: System · 운영체제
+      options:
+        - macOS, Apple silicon
+        - macOS, Intel
+        - Windows 11
+        - Windows 10
+        - Linux (.deb)
+        - Linux (.rpm)
+        - Linux (AppImage)
+        - Other · 기타
+    validations:
+      required: true
+  - type: input
+    id: os-detail
+    attributes:
+      label: System version · 운영체제 버전
+      placeholder: macOS 15.5 / Windows 11 24H2 / Ubuntu 24.04
+  - type: textarea
+    id: file
+    attributes:
+      label: About the PDF · PDF 정보
+      description: |
+        Size, number of pages, and what made it (Word, a scanner, a website...). If you can share the file, attach it only if it is not private.
+        크기, 쪽수, 만든 프로그램(Word, 스캐너, 웹사이트 등)을 적어 주세요. 파일을 공유할 수 있다면, 개인 정보가 없는 경우에만 첨부해 주세요.
+  - type: dropdown
+    id: preset
+    attributes:
+      label: Preset · 프리셋
+      options:
+        - Not relevant · 해당 없음
+        - Lossless · 무손실
+        - Print · 인쇄용
+        - Balanced · 균형
+        - Small · 최소

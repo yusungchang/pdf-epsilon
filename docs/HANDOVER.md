@@ -31,8 +31,9 @@ The code is public at https://github.com/yusungchang/pdf-epsilon, branch `main`.
 | Hostile-input hardening (`limits.rs`) | Done. Bounded decoding everywhere; 20 hostile-file tests on all platforms. See `SECURITY.md`. |
 | Thumbnails, page comparison, progress | Done in 0.4.0. Pages render in an isolated, memory-capped process; saving writes the compared copy. Checked in headless Chrome with a mocked bridge serving real renders; not yet clicked through in the real app window. |
 | Languages (`ui/locales`) | English and Korean. Every string is in the locale files; tests check they match. |
-| CI and releases (`.github/workflows/build.yml`) | Builds installers for all three platforms on every push to `main` and on `v*` tags. First run started on 19 October 2026. |
-| Windows and Linux | Configured, never built or run. |
+| CI and releases (`.github/workflows/build.yml`) | Builds installers for all three platforms on every push to `main` and on `v*` tags. Tags also attach fixed-name copies for the website and verify the Mac signature. v0.4.0 is published. |
+| Platforms | v0.4.0 tested by the owner on macOS (Intel and Apple silicon), Windows 11 and Linux Mint (`.deb`, VM): all ran. |
+| Website (`site/`, `pages.yml`) | Built in 0.4.1, English and Korean, checked in headless Chrome at desktop and phone width. Pages must be enabled once (source: GitHub Actions). |
 
 ## Environment on the owner's Mac
 
@@ -137,9 +138,8 @@ so `v0.4.0` is the first release to include it.
 
 ## Next steps
 
-1. **Test on other platforms.** The first push to `main` builds every installer. Download them from the run's
-   artifacts and try the Windows and Linux builds. The workflow has never run, so expect to fix something.
-   Push a tag such as `v0.2.0` for a draft release.
+1. **Website downloads.** The page's buttons work once a published release has the fixed-name files: the next
+   tagged release, or copies added to v0.4.0 by hand.
 2. **Owner decisions.** Choose a license, register the domain, and decide on code signing. Signing needs an Apple Developer
    account for macOS and a certificate for Windows.
 3. **Engine improvements,** in the order recommended by `reports/PDF size optimization techniques.md` (19 October 2026):

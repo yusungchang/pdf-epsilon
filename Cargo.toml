@@ -3,8 +3,9 @@ resolver = "2"
 members = ["crates/epsilon", "src-tauri"]
 
 [workspace.package]
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
+authors = ["yusungchang"]
 license = "UNLICENSED"
 homepage = "https://pdfepsilon.com"
 repository = "https://github.com/yusungchang/pdf-epsilon"

@@ -9,6 +9,46 @@
 | 0.3.0 | 2026-10-19 | Font optimizer: unused font tables dropped, fully embedded TrueType CID fonts subset. Research on further optimizations. |
 | 0.3.1 | 2026-10-19 | Security hardening against hostile PDFs: bounded decoding everywhere, file size cap, hostile-file tests on all platforms. |
 | 0.4.0 | 2026-10-21 | Analysis progress, page thumbnails and before-and-after page comparison in an isolated renderer, removing files from the list, compact language button, theme button, icon tools for the page list. |
+| 0.4.1 | 2026-10-21 | Long file names truncate on every WebKit, a round handle on the comparison divider, glass-finish icon, a product page on GitHub Pages, findings and pages folded under Advanced. |
+
+## 0.4.1, 21 October 2026
+
+The owner tested v0.4.0 on macOS (Intel and Apple silicon), Windows 11 and Linux Mint (the `.deb`, in a VM):
+everything ran. Visual follow-ups:
+
+1. **File names spilling.** On the Intel Mac a long name ran under the chip's ×. Some WebKit versions do not
+   let a button shrink below its text in a flex row; the name now has an explicit width and its own
+   ellipsis. Checked in Chrome and in a real WKWebView.
+2. **Divider handle.** The swipe divider has a round handle with arrows, kept at the vertical middle of the
+   part of the page in view while scrolling, zooming and resizing.
+3. **Icon.** Apple's Liquid Glass is rendered live by the system from a layered Icon Composer file, which
+   Tauri cannot package yet. A baked-in glass finish was drawn in two versions, glossy and soft, and the
+   owner chose soft: a light rim brightest at the top, a sheen fading out over the upper half, and a slightly
+   darker lower edge, all in `assets/icon.svg` over the unchanged artwork. Every platform icon was
+   regenerated from it. The flat icon is kept as `assets/icon-flat.svg` and `icon-flat.png`. The rim
+   defines the icon on dark backgrounds, so the header's CSS outline for the icon was removed.
+4. **Product page.** `site/` is a one-page website in English and Korean (from the browser's language,
+   a toggle, or `?lang=ko`), published by `.github/workflows/pages.yml` to
+   https://yusungchang.github.io/pdf-epsilon/. It picks the download for the visitor's system (a Mac gets
+   Apple silicon with Intel beside it, since browsers cannot tell them apart) and shows the latest
+   release's version from the GitHub API. Its screenshots come from the preview tool, which gained
+   `PREVIEW_SCALE` and `PREVIEW_CLEAN` and now forces the colour scheme from the first paint (the old flag
+   was ignored and caught the drop area mid-transition). The download buttons link to
+   `releases/latest/download/<name>`, which needs names without a version, so on tags `build.yml` also
+   attaches copies named `PDF-Epsilon-macOS-AppleSilicon.dmg`, `PDF-Epsilon-Windows-Setup.exe` and so on.
+   v0.4.0 predates this and has only versioned names.
+5. **Voice, author, bug reports.** The page leads with the app's own tagline, and its copy was cut to
+   one short line per feature in both languages (a more emotive headline was tried and reverted). The footer credits yusungchang, linked to LinkedIn, which is also the author in `Cargo.toml`,
+   `package.json` and the installers' publisher and copyright. Bug reports and ideas come in through GitHub
+   issue forms in both languages (`.github/ISSUE_TEMPLATE`), which warn that issues are public and ask
+   people not to attach private PDFs; the footer links to them.
+6. **Mac signature check.** `build.yml` now runs `codesign --verify --deep --strict` on the app and on the
+   copy inside the dmg, so a build that macOS would call damaged fails in CI instead.
+7. **Shorter report.** Below the save button, "What was found" and "Page by page" now sit in one block,
+   "Advanced" (고급 기능), closed by default and remembered between launches. The settings panel inside the
+   presets card, also called "Advanced" in English, became "Advanced settings" to match 고급 설정. The
+   preview tool gained `PREVIEW_OPEN=1` to start that block open, and turns off CSS transitions so a
+   screenshot never catches a panel mid-animation. The website screenshots were retaken.
 
 ## 0.4.0, 21 October 2026
 

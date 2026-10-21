@@ -54,7 +54,8 @@ window.__TAURI__ = {
 };
 setTimeout(async () => {
   const names = Object.keys(analyses);
-  addFiles([...names.map((n) => `/x/${n}`), "/x/locked-report.pdf"]);
+  // A fake encrypted file shows the error state, except in clean screenshots (PREVIEW_CLEAN=1).
+  addFiles([...names.map((n) => `/x/${n}`), ...(window.__CLEAN__ ? [] : ["/x/locked-report.pdf"])]);
   await new Promise((r) => setTimeout(r, 600));
   select(0);
   if (window.__SAVE__) await saveCopy();

@@ -30,7 +30,6 @@
   --c-unused: #c0392b;
   --c-overhead: #cfcfc8;
   --c-other: #dcdcd5;
-  --mark-edge: none;
   --control-edge: var(--line);
   color-scheme: light;
 }
@@ -67,8 +66,6 @@
     --c-unused: #ef6f61;
     --c-overhead: #55554f;
     --c-other: #44443f;
-    /* A faint light edge so the dark icon does not melt into the dark background. */
-    --mark-edge: drop-shadow(0 0 0.6px rgba(255, 255, 255, .55)) drop-shadow(0 0 1.5px rgba(255, 255, 255, .18));
     --control-edge: #4a4a44;
     color-scheme: dark;
   }
@@ -104,7 +101,6 @@
   --c-unused: #ef6f61;
   --c-overhead: #55554f;
   --c-other: #44443f;
-  --mark-edge: drop-shadow(0 0 0.6px rgba(255, 255, 255, .55)) drop-shadow(0 0 1.5px rgba(255, 255, 255, .18));
   --control-edge: #4a4a44;
   color-scheme: dark;
 }
@@ -144,7 +140,7 @@ header { padding: 20px 24px 8px; display: flex; justify-content: space-between; 
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .brand { display: flex; align-items: center; gap: 12px; }
 /* The app icon has a transparent margin, so it is drawn a little larger than the space it takes. */
-.mark { width: 52px; height: 52px; margin: -6px; filter: var(--mark-edge); }
+.mark { width: 52px; height: 52px; margin: -6px; }
 h1 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
 .tagline { margin: 0; color: var(--muted); font-size: 13px; }
 
@@ -172,16 +168,20 @@ main { padding: 12px 24px 32px; display: flex; flex-direction: column; gap: 14px
   border: 1px solid var(--line); background: var(--panel); border-radius: 9px;
 }
 .file.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+/* The name gets an explicit width: some WebKit versions do not let a button shrink below its
+   text in a flex row, so min-width alone left long names running under the ×. */
 .file-pick {
-  border: 0; background: none; text-align: left; cursor: pointer; min-width: 0;
+  border: 0; background: none; text-align: left; cursor: pointer;
+  flex: 1 1 0; min-width: 0; max-width: 206px; overflow: hidden;
   padding: 6px 4px 6px 10px; display: flex; flex-direction: column;
 }
 .file-remove {
-  border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0 9px;
+  flex: 0 0 auto; border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0 9px;
   font-size: 16px; line-height: 1; border-radius: 0 8px 8px 0;
 }
 .file-remove:hover { color: var(--bad); background: var(--soft); }
-.file-name { font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-name, .file-sub { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-name { font-weight: 550; }
 .file-sub { color: var(--muted); font-size: 12px; }
 
 .status { margin: 0; padding: 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; color: var(--muted); }
@@ -255,6 +255,17 @@ main { padding: 12px 24px 32px; display: flex; flex-direction: column; gap: 14px
 
 details { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
 summary { cursor: pointer; font-weight: 550; }
+.extra { background: none; border: 0; padding: 0; border-radius: 0; }
+.extra > summary {
+  display: flex; align-items: baseline; gap: 10px; list-style: none;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px;
+}
+.extra > summary::-webkit-details-marker { display: none; }
+.extra > summary::before { content: "▶"; font-size: 0.75em; transition: transform .12s; display: inline-block; }
+.extra[open] > summary::before { transform: rotate(90deg); }
+.extra > summary:hover { border-color: var(--accent); }
+.extra-hint { color: var(--muted); font-weight: 400; font-size: 13px; }
+.extra-body { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; padding: 12px 0 4px; }
 .row { display: flex; align-items: center; gap: 8px; grid-column: span 2; }
 .field { display: flex; flex-direction: column; gap: 4px; }
@@ -407,6 +418,12 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 /* The page underneath goes grey, so only the marks are in colour (a red page edge is not a mark). */
 .cmp-stage.diff .cmp-base { filter: grayscale(1); opacity: .45; }
 .cmp-line { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--accent); pointer-events: none; box-shadow: 0 0 0 1px rgba(255,255,255,.6); }
+.cmp-knob {
+  position: absolute; z-index: 1; width: 32px; height: 32px; margin: -16px 0 0 -16px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; pointer-events: none;
+  background: #fff; color: var(--accent); border: 2px solid var(--accent); box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+}
+.cmp-knob .icon { width: 18px; height: 18px; stroke-width: 1.8; }
 .cmp-slider { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: ew-resize; margin: 0; }
 .cmp-stage.side { display: flex; gap: 8px; align-items: flex-start; }
 .cmp-stage.side { justify-content: safe center; }

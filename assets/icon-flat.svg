@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- The artwork (icon-art.png) clipped to the macOS app icon shape: an 824 px rounded square
+       centred on a 1024 px canvas, as Apple's icon grid expects. -->
+  <defs>
+    <clipPath id="shape">
+      <rect x="100" y="100" width="824" height="824" rx="185" ry="185"/>
+    </clipPath>
+  </defs>
+  <image href="icon-art.png" xlink:href="icon-art.png" x="100" y="100" width="824" height="824" clip-path="url(#shape)" preserveAspectRatio="xMidYMid slice"/>
+</svg>

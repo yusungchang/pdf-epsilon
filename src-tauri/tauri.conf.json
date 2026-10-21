@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "PDF Epsilon",
   "mainBinaryName": "pdf-epsilon",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "identifier": "com.pdfepsilon.desktop",
   "build": {
     "frontendDist": "../ui"
@@ -28,6 +28,8 @@
     "active": true,
     "targets": "all",
     "category": "Productivity",
+    "publisher": "yusungchang",
+    "copyright": "© 2026 yusungchang",
     "shortDescription": "Make PDFs smaller. Keep what matters.",
     "longDescription": "PDF Epsilon shrinks PDF files on your own computer. It downsamples and re-encodes oversized images, merges duplicates and removes clutter, while keeping text, vector drawing, links, bookmarks and forms intact.",
     "homepage": "https://pdfepsilon.com",

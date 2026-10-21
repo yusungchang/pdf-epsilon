@@ -1,0 +1,11 @@
+name: Idea · 제안
+description: Something PDF Epsilon could do better. · 이런 기능이 있으면 좋겠어요.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help? · 어떤 점이 있으면 좋을까요?
+      description: The problem you have, more than the solution. · 해결책보다는 겪고 있는 불편을 적어 주세요.
+    validations:
+      required: true

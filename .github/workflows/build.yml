@@ -86,6 +86,40 @@ jobs:
           releaseName: ${{ startsWith(github.ref, 'refs/tags/v') && format('PDF Epsilon {0}', github.ref_name) || '' }}
           releaseDraft: true
           args: --target ${{ matrix.target }}
+      # A Mac app with only the linker's signature is reported as damaged once downloaded.
+      # Check the whole bundle, and the copy inside the dmg that people actually get.
+      - name: Check the Mac signature
+        if: runner.os == 'macOS'
+        run: |
+          B=target.nosync/${{ matrix.target }}/release/bundle
+          codesign --verify --deep --strict --verbose=2 "$B"/macos/*.app
+          M=$(mktemp -d)
+          hdiutil attach -nobrowse -readonly -mountpoint "$M" "$B"/dmg/*.dmg
+          codesign --verify --deep --strict --verbose=2 "$M"/*.app
+          hdiutil detach "$M"
+      # The same installers under names that never change, so the product page can link to
+      # releases/latest/download/<name>. Only on tags; they go to the same draft release.
+      - name: Attach fixed-name copies
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          B=target.nosync/${{ matrix.target }}/release/bundle
+          mkdir fixed
+          case "${{ matrix.name }}" in
+            macos-apple-silicon) cp "$B"/dmg/*.dmg fixed/PDF-Epsilon-macOS-AppleSilicon.dmg ;;
+            macos-intel) cp "$B"/dmg/*.dmg fixed/PDF-Epsilon-macOS-Intel.dmg ;;
+            windows-x64)
+              cp "$B"/nsis/*.exe fixed/PDF-Epsilon-Windows-Setup.exe
+              cp "$B"/msi/*.msi fixed/PDF-Epsilon-Windows.msi ;;
+            linux-x64)
+              cp "$B"/deb/*.deb fixed/PDF-Epsilon-Linux.deb
+              cp "$B"/rpm/*.rpm fixed/PDF-Epsilon-Linux.rpm
+              cp "$B"/appimage/*.AppImage fixed/PDF-Epsilon-Linux.AppImage ;;
+          esac
+          ls -l fixed
+          gh release upload "${{ github.ref_name }}" fixed/* --clobber
       - uses: actions/upload-artifact@v4
         with:
           name: pdf-epsilon-${{ matrix.name }}

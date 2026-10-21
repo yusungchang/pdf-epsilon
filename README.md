@@ -7,6 +7,8 @@ shrinks it on your own computer. Nothing is uploaded anywhere. Drop a PDF on the
 to see where its bytes go, page by page, and what each preset would save. Then save a
 smaller copy, named `<name>-epsilon.pdf`. The original is never changed.
 
+Website and downloads: https://yusungchang.github.io/pdf-epsilon/
+
 ## Analysis
 
 Before anything is changed, PDF Epsilon shows:
@@ -119,7 +121,9 @@ cargo run -p epsilon --release --example squeeze -- in.pdf out.pdf balanced
 - [src-tauri/](src-tauri/) is the desktop shell. Its binary is `pdf-epsilon`.
 - [ui/](ui/) is the interface: plain HTML, CSS and JavaScript with no build step.
 - [assets/icon-art.png](assets/icon-art.png) is the icon artwork, a crushed aluminium can marked PDF.
-  [assets/icon.svg](assets/icon.svg) clips it to the macOS rounded square. Regenerate the platform
+  [assets/icon.svg](assets/icon.svg) clips it to the macOS rounded square and adds a soft glass finish (rim, sheen, depth).
+  The flat icon without the finish is kept as [assets/icon-flat.svg](assets/icon-flat.svg) (and
+  `icon-flat.png`); to switch back, run `npx tauri icon` with it instead. Regenerate the platform
   icons with `npx tauri icon assets/icon.svg -o src-tauri/icons`, then delete the `android` and `ios`
   folders it creates and copy `src-tauri/icons/128x128@2x.png` to `ui/icon.png`.
 
@@ -131,3 +135,16 @@ platform. They can be downloaded from the run's artifacts for 14 days. Pushing a
 Windows, and `.deb`, `.rpm` and `.AppImage` for Linux. The builds are not signed with a
 developer certificate yet. On macOS, open the app once from System Settings, Privacy & Security,
 Open Anyway; Windows SmartScreen asks for More info, Run anyway.
+
+Tagged builds also attach copies under names without a version (`PDF-Epsilon-macOS-AppleSilicon.dmg`,
+`PDF-Epsilon-macOS-Intel.dmg`, `PDF-Epsilon-Windows-Setup.exe`, `PDF-Epsilon-Windows.msi`,
+`PDF-Epsilon-Linux.deb`, `.rpm`, `.AppImage`), so `releases/latest/download/<name>` always points at the
+newest published release.
+
+## Website
+
+[site/](site/) is the product page, plain HTML with English and Korean text. Pushing a change under
+`site/` to `main` publishes it to GitHub Pages through `.github/workflows/pages.yml`. To preview it,
+run `python3 -m http.server --directory site` and open http://localhost:8000/ (add `?lang=ko` for Korean).
+The screenshots in `site/shots/` are made with `tools/ui-preview/preview.sh` at `PREVIEW_SCALE=2` and
+`PREVIEW_CLEAN=1`, from a demo PDF.

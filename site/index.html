@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PDF Epsilon — Make PDFs smaller. Keep what matters.</title>
+  <meta name="description" content="A free desktop app for macOS, Windows and Linux that shows why a PDF is large, page by page, and makes it smaller on your own computer. Nothing is uploaded.">
+  <meta property="og:title" content="PDF Epsilon">
+  <meta property="og:description" content="Make PDFs smaller. Keep what matters.">
+  <meta property="og:image" content="shots/report.png">
+  <link rel="icon" href="icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Text in two languages: each element carries its English text, and site.js swaps in Korean
+       from its table when the visitor's language is Korean or they choose it. -->
+  <header class="top">
+    <a class="brand" href="#">
+      <img src="icon.png" alt="" width="40" height="40">
+      <span>PDF Epsilon</span>
+    </a>
+    <nav>
+      <a href="#features" data-t="nav.features">Features</a>
+      <a href="#download" data-t="nav.download">Download</a>
+      <a href="https://github.com/yusungchang/pdf-epsilon">GitHub</a>
+      <button id="lang" class="lang" type="button" aria-label="Language">한국어</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <img class="hero-icon" src="icon.png" alt="" width="128" height="128">
+      <h1 data-t="hero.title">Make PDFs smaller.<br>Keep what matters.</h1>
+      <p class="lead" data-t="hero.lead">See why a PDF is heavy, page by page, and make it lighter on your own computer. Not a word changes.</p>
+      <div class="cta">
+        <a id="primary" class="button primary" href="#download"><span id="primary-label" data-t="hero.download">Download</span></a>
+        <a class="button" href="#download" data-t="hero.other">All downloads</a>
+      </div>
+      <p id="version" class="version" hidden></p>
+      <figure class="shot hero-shot">
+        <img id="shot-report" src="shots/report.png" alt="PDF Epsilon showing where the bytes of a report go and what each preset saves" width="1640" height="1600">
+      </figure>
+    </section>
+
+    <section id="features" class="features">
+      <h2 data-t="features.title">Understand first, then shrink</h2>
+      <div class="grid">
+        <article>
+          <h3 data-t="f1.title">Where the bytes go</h3>
+          <p data-t="f1.text">Every byte counted, for the whole file and each page.</p>
+        </article>
+        <article>
+          <h3 data-t="f2.title">Measured, not guessed</h3>
+          <p data-t="f2.text">Each preset runs on your file first. The size you see is the size you get.</p>
+        </article>
+        <article>
+          <h3 data-t="f3.title">Compare before saving</h3>
+          <p data-t="f3.text">Drag across any page to see the original against the smaller copy.</p>
+        </article>
+        <article>
+          <h3 data-t="f4.title">Sharp where it counts</h3>
+          <p data-t="f4.text">Photos become efficient JPEGs. Charts and screenshots stay lossless.</p>
+        </article>
+        <article>
+          <h3 data-t="f5.title">Slimmer fonts</h3>
+          <p data-t="f5.text">Only the letters in use are kept. One file went from 15 MB to 80 KB.</p>
+        </article>
+        <article>
+          <h3 data-t="f6.title">Private and careful</h3>
+          <p data-t="f6.text">Works offline, and leaves alone anything it doesn’t fully understand.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="results">
+      <h2 data-t="results.title">Real files, measured</h2>
+      <p class="sub" data-t="results.sub">Balanced preset. Text and pages unchanged.</p>
+      <div class="numbers">
+        <div><strong>−91%</strong><span data-t="r1">Newspaper article with Korean fonts<br>3.4 MB → 313 KB</span></div>
+        <div><strong>−76%</strong><span data-t="r2">Research paper with figures<br>3.1 MB → 773 KB</span></div>
+        <div><strong>−67%</strong><span data-t="r3">Conference slide deck<br>3.3 MB → 1.1 MB</span></div>
+        <div><strong>−28%</strong><span data-t="r4">49-page survey report<br>3.0 MB → 2.2 MB</span></div>
+      </div>
+    </section>
+
+    <section class="showcase">
+      <figure class="shot">
+        <img id="shot-compare" src="shots/compare.png" alt="Comparing a page before and after, with a divider to drag across" width="1640" height="1400">
+      </figure>
+      <div>
+        <h2 data-t="compare.title">See it before you save it</h2>
+        <p data-t="compare.text">Each page as it is and as it will be saved. What you compare is exactly what gets written.</p>
+      </div>
+    </section>
+
+    <section id="download" class="download">
+      <h2 data-t="download.title">Download</h2>
+      <p class="sub" data-t="download.sub">Free for macOS, Windows and Linux.</p>
+      <div class="platforms">
+        <article id="mac">
+          <h3>macOS</h3>
+          <a class="button primary" href="https://github.com/yusungchang/pdf-epsilon/releases/latest/download/PDF-Epsilon-macOS-AppleSilicon.dmg" data-t="dl.macArm">Apple silicon (M1 and later)</a>
+          <a class="button" href="https://github.com/yusungchang/pdf-epsilon/releases/latest/download/PDF-Epsilon-macOS-Intel.dmg" data-t="dl.macIntel">Intel</a>
+          <p class="note" data-t="dl.macWhich">Apple menu → About This Mac: “Chip” is Apple silicon, “Processor” is Intel.</p>
+          <details>
+            <summary data-t="first.title">First launch</summary>
+            <p data-t="first.mac">Move it to Applications and open it. If macOS can’t verify it, go to System Settings → Privacy &amp; Security → Open Anyway. Only once.</p>
+          </details>
+        </article>
+        <article id="windows">
+          <h3>Windows</h3>
+          <a class="button primary" href="https://github.com/yusungchang/pdf-epsilon/releases/latest/download/PDF-Epsilon-Windows-Setup.exe" data-t="dl.winSetup">Installer (.exe)</a>
+          <a class="button" href="https://github.com/yusungchang/pdf-epsilon/releases/latest/download/PDF-Epsilon-Windows.msi" data-t="dl.winMsi">MSI package</a>
+          <p class="note" data-t="dl.winNote">Windows 10 and 11, 64-bit.</p>
+          <details>
+            <summary data-t="first.title">First launch</summary>
+            <p data-t="first.win">If SmartScreen appears, click More info, then Run anyway.</p>
+          </details>
+        </article>
+        <article id="linux">
+          <h3>Linux</h3>
+          <a class="button primary" href="https://github.com/yusungchang/pdf-epsilon/releases/latest/download/PDF-Epsilon-Linux.deb" data-t="dl.deb">Debian, Ubuntu, Mint (.deb)</a>
+          <a class="button" href="https://github.com/yusungchang/pdf-epsilon/releases/latest/download/PDF-Epsilon-Linux.AppImage">AppImage</a>
+          <a class="button" href="https://github.com/yusungchang/pdf-epsilon/releases/latest/download/PDF-Epsilon-Linux.rpm" data-t="dl.rpm">Fedora (.rpm)</a>
+          <details>
+            <summary data-t="first.title">First launch</summary>
+            <p data-t="first.linux">For the .deb, run <code>sudo apt install ./PDF-Epsilon-Linux.deb</code> in the folder you downloaded it to. For the AppImage, run <code>chmod +x PDF-Epsilon-Linux.AppImage</code>, then open it.</p>
+          </details>
+        </article>
+      </div>
+      <p class="all"><a href="https://github.com/yusungchang/pdf-epsilon/releases" data-t="download.all">All versions and release notes</a></p>
+    </section>
+  </main>
+
+  <footer>
+    <p><span data-t="footer.text">PDF Epsilon runs entirely on your computer.</span> · <a href="https://github.com/yusungchang/pdf-epsilon" data-t="footer.source">Source on GitHub</a> · <a href="https://github.com/yusungchang/pdf-epsilon/issues/new/choose" data-t="footer.bug">Report a bug</a></p>
+    <p class="author"><span data-t="footer.author">Made by</span> <a href="https://www.linkedin.com/in/yusungchang/" rel="author">yusungchang</a> · © 2026</p>
+  </footer>
+
+  <script src="site.js"></script>
+</body>
+</html>

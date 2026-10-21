@@ -102,6 +102,10 @@
         <div id="save-result" class="save-result" hidden></div>
       </section>
 
+      <!-- Details most people don't need before saving: closed until opened, and remembered. -->
+      <details id="more" class="extra">
+        <summary><span data-i18n="more.title"></span><span class="extra-hint" data-i18n="more.hint"></span></summary>
+        <div class="extra-body">
       <section class="card">
         <h3 data-i18n="found.title"></h3>
         <ul id="findings" class="findings"></ul>
@@ -122,6 +126,8 @@
         <div id="pages" class="pages"></div>
         <button id="more-pages" class="link more" type="button" hidden></button>
       </section>
+        </div>
+      </details>
     </div>
   </main>
 
