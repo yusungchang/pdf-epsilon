@@ -684,9 +684,9 @@ function jumpToPage(n) {
   document.querySelector(`[data-page="${n}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
-// "Advanced" below the save button: closed by default, remembered between launches.
-$("more").open = load("moreOpen", false) === true;
-$("more").addEventListener("toggle", () => save("moreOpen", $("more").open));
+// "Details" below the save button starts closed at every launch. It used to be remembered, so a
+// stored "open" from an earlier version is cleared.
+try { localStorage.removeItem("moreOpen"); } catch { /* storage unavailable */ }
 
 // Thumbnails are rendered on demand, for rows that scroll into view, in a separate process.
 const thumbObserver = new IntersectionObserver((entries) => {
