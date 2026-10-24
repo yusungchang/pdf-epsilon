@@ -15,8 +15,65 @@
 | 0.7.0 | 2026-10-24 | Every copy is checked (structure, letters, images); images sized where they are really drawn; `/UserUnit`; bounded form walks; less memory on big files; stale `/Prev` fixed. |
 | 0.8.0 | 2026-10-24 | Desktop shell: renderer memory really capped and quiet, two at a time and cancellable; saving never writes an outdated copy; clear save errors; safe writing. |
 | 0.9.0 | 2026-10-24 | Save all, Open With and Dock drops, Cancel and save progress, and the interface fixes from the 1.0 review. |
+| 0.9.1 | 2026-10-24 | Comparison of cloud files fixed; preset names as tags; version shown; Korean labels; full regression against 0.6.0. |
 | 0.5.0 | 2026-10-21 | 0.4.1 released as a minor version at the owner's request; first-launch steps shown on every download; security review. |
 | 0.4.1 | 2026-10-21 | Long file names truncate on every WebKit, a round handle on the comparison divider, glass-finish icon, a product page on GitHub Pages, findings and pages folded under Advanced. |
+
+## 0.9.1, 24 October 2026
+
+1. **Comparison failed for files in cloud folders.**
+   - *Reported:* the owner, comparing a PDF in a OneDrive shared library, saw "이 페이지를 렌더링하지 못했습니다"
+     ("This page could not be rendered").
+   - *Found:* the 0.8.0 check that drops an outdated comparison copy compared the file's modification time
+     to the nanosecond. When iCloud Drive downloads an online-only file on first read, its time moves by
+     nanoseconds: measured +37 ns on a file made online-only with `brctl evict`, with the size unchanged.
+     The copy was then taken as outdated and dropped, and the compressed side could not be drawn. OneDrive
+     files could not be read from the terminal (macOS privacy protection), so that case was reasoned from
+     the iCloud one.
+   - *Fix:* the time is compared to the millisecond, and taken after the file has been read (and so
+     downloaded). A test sets a file's time 37 ns later (the copy is kept), then 2 s later (dropped).
+   - *A second cause:* while this was being tested, the automated test runs force-quit every PDF Epsilon
+     process on the Mac, the owner's open app and its renderers included. All builds share one bundle
+     identifier, so `open` could also bring up another copy that was already running. Once neither
+     interfered, the owner's own run rendered 14 of 14 comparisons, at Fit and zoomed in. The owner's
+     failing screenshot left no log, so it cannot be told which cause it was.
+2. **Preset names inside sentences are tags.** A small bordered tag, like a keyword, replaces the
+   Korean quotation marks ‘균형’, in both languages. The locale text marks names `[[like this]]`, and
+   the interface draws them with `rich()`: findings, warnings, the custom-settings note, pills, the page
+   table header and the comparison title. Names that stand alone (preset cards, swipe labels, label
+   forms such as "균형: −19 MB") stay plain. `tests/locales.rs` checks that every mark is closed and that
+   each language tags as many names as English.
+3. **Korean labels.** "세부 정보" became "자세한 정보"; "발견한 것" became "발견된 문제점" (the folded block's hint too).
+4. **The version is shown,** small and faint beside "PDF Epsilon" in the header.
+5. **Regression against 0.6.0.**
+   - *How:* 0.6.0 was built from its tag, both versions the way the app ships them (with `zlib-rs`), and
+     both were run on the same files.
+   - *Real test files (8 files, 4 presets):* all 32 outputs are byte-for-byte identical to 0.6.0, and
+     have the original's pages and text. The analyses match exactly: every preset's size, every finding,
+     every category.
+   - *Renderer:* thumbnails identical to 0.6.0, at the same time and memory.
+   - *qpdf corpus (708 files, Balanced):*
+     - no crash or hang in either version;
+     - 703 files have the same outcome and output size as 0.6.0;
+     - two now write a copy (the stale `/Prev` fix of 0.7.0);
+     - three `png-filters` files differ by up to 4% in size, because their decode parameters are written
+       as an array, which 0.6.2 now reads properly; at 300 dpi both versions match the original
+       exactly.
+     - Text identical in all copies except two whose originals MuPDF cannot read, as before. One more
+       mismatch in the first run did not reproduce in five reruns: that file is deliberately malformed
+       and MuPDF's warnings vary.
+   - *Hostile corpus (23 files):* the same outcomes, and peak memory within run-to-run variation. Five
+     runs each: `many-nulls.pdf` 473–585 MB on 0.6.0 and 462–588 MB now; the font bomb 626–807 MB and
+     615–693 MB. The 10-level form fan-out ran past 120 s on 0.6.0 (killed) and takes 2.8 s now. The
+     500,000-object file takes 25 s and 3.6 GB on both.
+   - *Performance:* measured as CPU time, alternating versions, five runs each, because wall-clock times
+     varied by up to four times on this Mac.
+     - Analysis takes 5.1% more CPU than 0.6.0 (7.67 s → 8.07 s for the eight files).
+     - Saving with Balanced takes 4.2% more (2.16 s → 2.25 s).
+     - This is the cost of the checks added in 0.7.0: reading every copy back, the letter check, and
+       decoding each new image again. Memory is unchanged.
+   - *Also run:* all engine and shell tests, every interface screen in both languages (49, no script
+     error), and `npm run build`.
 
 ## 0.9.0, 24 October 2026
 

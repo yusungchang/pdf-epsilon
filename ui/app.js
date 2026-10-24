@@ -32,6 +32,15 @@ const el = (tag, cls, text) => {
   if (text !== undefined) e.textContent = text;
   return e;
 };
+
+// Text where names are marked [[like this]] (preset names inside sentences): each name is
+// drawn as a small bordered tag, so it stands apart from the words around it in any language.
+function rich(node, text) {
+  const parts = String(text).split(/\[\[|\]\]/);
+  node.replaceChildren(...parts.map((p, i) => (i % 2 ? el("span", "name-tag", p) : p)).filter((p) => p !== ""));
+  return node;
+}
+const richEl = (tag, cls, text) => rich(el(tag, cls), text);
 const state = {
   presets: {},          // id -> options, from the engine
   preset: "balanced",
@@ -177,9 +186,9 @@ function choosePreset(id) {
 }
 
 function renderSettings() {
-  $("preset-note").textContent = state.custom
+  rich($("preset-note"), state.custom
     ? t("presets.custom", { preset: presetName(state.preset) })
-    : t(`presetNote.${state.preset}`);
+    : t(`presetNote.${state.preset}`));
 
   const o = state.options;
   const img = o.images || state.presets.balanced.images;
@@ -423,7 +432,7 @@ function renderWarnings(a) {
   const warnings = a.findings.filter((x) => x.status === "warning");
   box.replaceChildren(...warnings.map((w) => {
     const d = el("div", "warning");
-    d.append(el("strong", "", say(w.title)), el("span", "", ` ${w.detail.map(say).join(" ")}`));
+    d.append(richEl("strong", "", say(w.title)), richEl("span", "", ` ${w.detail.map(say).join(" ")}`));
     return d;
   }));
   const unreadable = a.file.unreadablePages;
@@ -645,8 +654,8 @@ function renderFindings(a) {
     const li = el("li", `finding sev-${x.severity}`);
     const head = el("div", "f-head");
     const [tone, text] = statusPill(x);
-    head.append(el("span", "f-title", say(x.title)), el("span", "f-bytes", formatBytes(x.bytes)), el("span", `pill ${tone}`, text));
-    li.append(head, el("p", "f-detail", x.detail.map(say).join(" ")));
+    head.append(richEl("span", "f-title", say(x.title)), el("span", "f-bytes", formatBytes(x.bytes)), richEl("span", `pill ${tone}`, text));
+    li.append(head, richEl("p", "f-detail", x.detail.map(say).join(" ")));
     if (x.pages.length) {
       const pages = el("div", "f-pages");
       pages.append(el("span", "", t("found.pages", { count: x.pages.length })));
@@ -851,7 +860,7 @@ function pageDetail(p, i, images, fonts) {
     const tbl = el("table", "pd-table");
     const head = el("tr");
     const withPreset = state.custom ? t("table.withCustom") : t("table.with", { preset: presetName(state.preset) });
-    for (const h of [t("table.image"), t("table.storedAs"), t("table.size"), t("table.shown"), withPreset]) head.append(el("th", "", h));
+    for (const h of [t("table.image"), t("table.storedAs"), t("table.size"), t("table.shown"), withPreset]) head.append(richEl("th", "", h));
     tbl.append(head);
     for (const im of imgs) {
       const tr = el("tr");
@@ -980,7 +989,7 @@ async function openCompare(f, page) {
   } catch (e) {
     prepareTicket = null;
     if (!current()) return;
-    title.textContent = t("compare.pageTitle", { page, total: f.analysis.pages.length, settings: settingsLabel() });
+    rich(title, t("compare.pageTitle", { page, total: f.analysis.pages.length, settings: settingsLabel() }));
     body.replaceChildren(el("p", "error", errorText(e)));
     return;
   }
@@ -1009,7 +1018,7 @@ async function openCompare(f, page) {
 
   async function draw() {
     const p = a.pages[view.page - 1];
-    title.textContent = t("compare.pageTitle", { page: view.page, total, settings: settingsLabel() });
+    rich(title, t("compare.pageTitle", { page: view.page, total, settings: settingsLabel() }));
     prev.disabled = view.page <= 1;
     next.disabled = view.page >= total;
 
@@ -1486,6 +1495,7 @@ const globe = () => icon("globe", "globe");
 
 async function init() {
   await setLanguage(pickLanguage());
+  window.__TAURI__.app.getVersion().then((v) => { $("version").textContent = v; }).catch(() => {});
   renderUpdate();
   renderThemePicker();
   renderLanguagePicker();

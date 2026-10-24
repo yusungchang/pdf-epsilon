@@ -168,3 +168,33 @@ fn english_has_every_key_in_use() {
     let missing: Vec<&String> = used.iter().filter(|k| !en.contains_key(*k)).collect();
     assert!(missing.is_empty(), "missing from en.json: {missing:?}");
 }
+
+/// Names drawn as tags are marked `[[like this]]`. Every mark must close, and each language
+/// must tag as many names in a string as English does.
+#[test]
+fn name_tags_are_closed_and_match_english() {
+    fn tags(v: &Value) -> Vec<usize> {
+        let texts: Vec<&str> = match v {
+            Value::String(s) => vec![s.as_str()],
+            Value::Object(forms) => forms.values().filter_map(Value::as_str).collect(),
+            _ => vec![],
+        };
+        texts
+            .iter()
+            .map(|t| {
+                let (open, close) = (t.matches("[[").count(), t.matches("]]").count());
+                assert_eq!(open, close, "unbalanced [[ ]] in {t:?}");
+                assert!(!t.contains("[[[") && !t.contains("]]]"), "doubled brackets in {t:?}");
+                open
+            })
+            .collect()
+    }
+    let en = locale("en.json");
+    for name in locales() {
+        for (key, value) in locale(&name) {
+            let here: usize = tags(&value).into_iter().max().unwrap_or(0);
+            let english: usize = tags(&en[&key]).into_iter().max().unwrap_or(0);
+            assert_eq!(here, english, "{name}: {key} tags {here} names, English {english}");
+        }
+    }
+}

@@ -299,6 +299,11 @@ small { color: var(--muted); }
 .primary { border: 0; background: var(--accent); color: var(--accent-ink); font-weight: 600; border-radius: 8px; padding: 8px 16px; cursor: pointer; }
 .primary:disabled { opacity: .6; cursor: default; }
 .save-buttons { display: flex; align-items: center; gap: 10px; }
+/* A preset name inside a sentence: a small bordered tag, like a keyword. */
+.name-tag { display: inline-block; padding: 0 6px; margin: 0 1px; border: 1px solid var(--line); border-radius: 5px; background: var(--soft); color: var(--ink); font-weight: 600; font-size: .92em; line-height: 1.45; white-space: nowrap; }
+.pill .name-tag { padding: 0 4px; background: transparent; border-color: currentColor; color: inherit; font-size: inherit; line-height: 1.2; }
+/* The version, beside the name: there when looked for, otherwise unnoticed. */
+.version { font-size: 11px; font-weight: 400; color: var(--muted); opacity: .7; letter-spacing: .02em; vertical-align: middle; }
 .secondary { border: 1px solid var(--line); background: var(--panel); color: var(--ink); font-weight: 600; border-radius: 8px; padding: 7px 14px; cursor: pointer; }
 .secondary:hover:not(:disabled) { border-color: var(--accent); }
 .secondary:disabled { opacity: .6; cursor: default; }

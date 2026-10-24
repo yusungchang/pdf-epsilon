@@ -262,12 +262,15 @@ fn settings_key(options: &Options) -> String {
     format!("{options:?}")
 }
 
-/// Size and modification time: what tells a file was changed or replaced.
-type Stamp = Option<(u64, std::time::SystemTime)>;
+/// Size and modification time: what tells a file was changed or replaced. The time is kept
+/// to the millisecond: cloud folders (iCloud Drive, OneDrive) move it by nanoseconds when an
+/// online-only file is downloaded on first read, which is not a change.
+type Stamp = Option<(u64, u128)>;
 
 fn stamp(path: &Path) -> Stamp {
     let m = std::fs::metadata(path).ok()?;
-    Some((m.len(), m.modified().ok()?))
+    let ms = m.modified().ok()?.duration_since(std::time::UNIX_EPOCH).ok()?.as_millis();
+    Some((m.len(), ms))
 }
 
 impl Prepared {
@@ -308,14 +311,14 @@ async fn prepare(
         let _ = progress.send(1.0);
         return Ok(report);
     }
-    // Stamped before reading, so a change while compressing makes the copy stale, not wrong.
-    let before = stamp(&path);
     let stop = tickets.start(ticket);
     let made = {
         let path = path.clone();
         let options = options.clone();
-        tauri::async_runtime::spawn_blocking(move || guarded(|| -> Result<(Vec<u8>, Report), Failure> {
+        tauri::async_runtime::spawn_blocking(move || guarded(|| -> Result<(Vec<u8>, Report, Stamp), Failure> {
             let input = epsilon::read_input(&path).map_err(reading)?;
+            // Stamped once read: an online-only file has been downloaded by then.
+            let read = stamp(&path);
             let last = Mutex::new(Instant::now());
             let report = |done: f32| {
                 check(&stop);
@@ -326,14 +329,15 @@ async fn prepare(
                     }
                 }
             };
-            Ok(epsilon::compress_bytes_with_progress(&input, &options, &report)?)
+            let (bytes, report) = epsilon::compress_bytes_with_progress(&input, &options, &report)?;
+            Ok((bytes, report, read))
         }))
         .await
         .map_err(internal)?
     };
     tickets.end(ticket);
-    let (bytes, report) = made?;
-    prepared.put(path, &options, before, Arc::new(bytes), report.clone());
+    let (bytes, report, read) = made?;
+    prepared.put(path, &options, read, Arc::new(bytes), report.clone());
     Ok(report)
 }
 
@@ -700,6 +704,26 @@ mod tests {
         let cwd = Path::new("/Users/me/Documents");
         let args = ["report.PDF", "/tmp/b.pdf", "--flag", "notes.txt", "folder"].map(std::ffi::OsString::from);
         assert_eq!(pdf_arguments(args, cwd), vec![cwd.join("report.PDF"), PathBuf::from("/tmp/b.pdf")]);
+    }
+
+    #[test]
+    fn a_cloud_download_is_not_taken_for_an_edit() {
+        // iCloud Drive moved an online-only file's time by 37 ns when it downloaded it on first
+        // read. That must not drop the comparison copy; a real edit must.
+        let dir = temp_dir("cloud");
+        let file = dir.join("a.pdf");
+        std::fs::write(&file, b"same bytes").unwrap();
+        let base = std::time::UNIX_EPOCH + std::time::Duration::new(1_792_822_510, 940_159_760);
+        let set = |t| std::fs::File::options().write(true).open(&file).unwrap().set_modified(t).unwrap();
+        set(base);
+        let prepared = Prepared::default();
+        let options = Preset::Balanced.options();
+        prepared.put(file.clone(), &options, stamp(&file), Arc::new(vec![1]), Report::default());
+        set(base + std::time::Duration::from_nanos(37));
+        assert!(prepared.get(&file, &options).is_some(), "a download's nanoseconds dropped the copy");
+        set(base + std::time::Duration::from_secs(2));
+        assert!(prepared.get(&file, &options).is_none(), "an edit kept the copy");
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
