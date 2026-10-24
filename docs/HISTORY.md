@@ -18,7 +18,7 @@
 | 0.9.1 | 2026-10-24 | Comparison of cloud files fixed; preset names as tags; version shown; Korean labels; full regression against 0.6.0. |
 | 0.10.0 | 2026-10-24 | Faster: images on every core, a SIMD resizer, shared work in analyses, a lookup table in the operation count; memory sized to the computer. Analysis 1.8×, saving 2.0× against 0.9.0. |
 | 0.11.0 | 2026-10-25 | Released as a minor version at the owner's request (built locally as 0.10.1). Comparison pictures no longer lost when they arrive after the reply (the cause of "could not be rendered", worst at 2× and 4×). "Details" starts closed; no focus ring on the comparison's close button when it opens. |
-| 0.11.1 | 2026-10-25 | One "Compare pages" button above the page list instead of one per page; page arrows in the comparison moved into the toolbar as "‹ Page 3 of 12 ›", with the arrow keys. |
+| 0.11.1 | 2026-10-25 | One "Compare pages" button above the page list instead of one per page; page arrows in the comparison moved into the toolbar as "‹ Page 3 of 12 ›", with the arrow keys; zoom icons; "Only pages with issues" in the comparison. |
 | 0.5.0 | 2026-10-21 | 0.4.1 released as a minor version at the owner's request; first-launch steps shown on every download; security review. |
 | 0.4.1 | 2026-10-21 | Long file names truncate on every WebKit, a round handle on the comparison divider, glass-finish icon, a product page on GitHub Pages, findings and pages folded under Advanced. |
 
@@ -41,6 +41,16 @@
 - *Tested:* `tests/locales.rs` passes. Screenshots from the harness of the page list and the comparison
   (swipe, side by side, error) in both languages. The harness now opens "Details" directly, since the app
   no longer remembers it open.
+
+**Zoom icons and "Only pages with issues" in the comparison, at the owner's request.**
+
+- *Zoom:* Fit has a frame-corners icon, and 2× and 4× a magnifier with a plus, beside their labels.
+- *Only pages with issues:* the page list's switch (the warning-sign icon) also sits at the start of the
+  comparison's page control. It is the same switch, not a copy: turning it on in either place turns it
+  on in both, and the list behind the window follows. While it is on, the arrows (and arrow keys) skip
+  pages without issues and are disabled when no page with an issue lies in that direction. The page
+  shown does not change when it is switched, and the label still gives the real page number.
+- *Tested:* harness screenshots of the comparison toolbar in English and Korean.
 
 ## 0.11.0, 25 October 2026
 

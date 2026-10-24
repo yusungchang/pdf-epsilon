@@ -963,7 +963,7 @@ async function openCompare(f, page) {
     b.setAttribute("aria-label", t(key));
     b.title = t(key);
     // Each page is drawn at its own proportions, not those of the page before.
-    b.onclick = () => { view.page += d; view.aspect = 0; draw(); };
+    b.onclick = () => step(d);
     // Enabled once the page can be drawn.
     b.disabled = true;
   }
@@ -1021,9 +1021,36 @@ async function openCompare(f, page) {
   const note = el("p", "hint");
   body.replaceChildren(toolbar, scroller, captions, note);
   // Moving between pages: "‹ Page 3 of 12 ›" at the end of the toolbar, and the arrow keys.
+  // "Only pages with issues" is the page list's own switch: the arrows then skip clean pages, and
+  // the list behind follows.
   const pager = el("div", "cmp-pager");
   const pageOf = el("span", "cmp-page-of");
-  pager.append(prev, pageOf, next);
+  const onlyIssues = el("button", "icon-btn");
+  onlyIssues.type = "button";
+  onlyIssues.dataset.focus = "compare:onlyIssues";
+  onlyIssues.setAttribute("aria-label", t("pages.onlyIssues"));
+  onlyIssues.dataset.tip = t("pages.onlyIssues");
+  onlyIssues.append(icon("issues"));
+  onlyIssues.onclick = () => {
+    $("only-issues").setAttribute("aria-pressed", String(!pressed("only-issues")));
+    state.shown = PAGE_BATCH;
+    renderPages(a);
+    draw();
+  };
+  pager.append(onlyIssues, el("span", "tool-sep"), prev, pageOf, next);
+  // The next page in direction d (1 or -1) that the arrows may show, or 0 when there is none.
+  const target = (d) => {
+    const only = pressed("only-issues");
+    for (let n = view.page + d; n >= 1 && n <= total; n += d) if (!only || a.pages[n - 1].issues.length) return n;
+    return 0;
+  };
+  function step(d) {
+    const n = target(d);
+    if (!n) return;
+    view.page = n;
+    view.aspect = 0;
+    draw();
+  }
   dlg.onkeydown = (e) => {
     // The swipe divider and other inputs use the arrow keys themselves.
     if (e.target.closest("input, select, textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -1033,8 +1060,9 @@ async function openCompare(f, page) {
 
   const segmented = (items, current, set) => {
     const g = el("div", "segmented");
-    for (const [value, label] of items) {
+    for (const [value, label, iconName] of items) {
       const b = el("button", value === current ? "on" : "", label);
+      if (iconName) b.prepend(icon(iconName));
       b.type = "button";
       b.dataset.focus = `segment:${items.map(([v]) => v).join("/")}:${value}`;
       b.setAttribute("aria-pressed", String(value === current));
@@ -1047,8 +1075,9 @@ async function openCompare(f, page) {
   async function draw() {
     const p = a.pages[view.page - 1];
     rich(title, t("compare.title", { settings: settingsLabel() }));
-    prev.disabled = view.page <= 1;
-    next.disabled = view.page >= total;
+    onlyIssues.setAttribute("aria-pressed", String(pressed("only-issues")));
+    prev.disabled = !target(-1);
+    next.disabled = !target(1);
 
     const diffToggle = el("label", "cmp-check");
     const box = el("input");
@@ -1060,7 +1089,7 @@ async function openCompare(f, page) {
     keepFocus(() => toolbar.replaceChildren(
       segmented([["swipe", t("compare.swipe")], ["side", t("compare.side")]], view.mode, (v) => { view.mode = v; }),
       // A new magnification centres the view and puts the divider in the middle of the screen.
-      segmented(ZOOMS.map((z) => [z, z === 1 ? t("compare.zoomFit") : `${z}×`]), view.zoom, (v) => {
+      segmented(ZOOMS.map((z) => [z, z === 1 ? t("compare.zoomFit") : `${z}×`, z === 1 ? "fit" : "zoomIn"]), view.zoom, (v) => {
         view.zoom = v;
         view.split = 50;
         view.recentre = true;
@@ -1359,6 +1388,8 @@ const ICONS = {
   light: ["M8 5.2a2.8 2.8 0 1 0 0 5.6a2.8 2.8 0 1 0 0-5.6", "M8 1.5v1.5", "M8 13v1.5", "M1.5 8H3", "M13 8h1.5", "M3.4 3.4l1 1", "M11.6 11.6l1 1", "M3.4 12.6l1-1", "M11.6 4.4l1-1"],
   dark: ["M13 9.5A5.5 5.5 0 1 1 6.5 3a4.5 4.5 0 0 0 6.5 6.5Z"],
   update: ["M13.2 6A5.5 5.5 0 1 0 13.5 8", "M13.5 2.5V6H10"],
+  fit: ["M2 5.5V2h3.5", "M10.5 2H14v3.5", "M14 10.5V14h-3.5", "M5.5 14H2v-3.5"],
+  zoomIn: ["M7 2.5a4.5 4.5 0 1 0 0 9a4.5 4.5 0 1 0 0-9", "M10.3 10.3L13.5 13.5", "M7 5v4", "M5 7h4"],
 };
 
 // ---- theme: System (the default) follows the operating system; Light and Dark override it ----

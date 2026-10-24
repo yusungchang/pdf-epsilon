@@ -442,7 +442,7 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 .cmp-tools { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .cmp-check { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; cursor: pointer; }
 .segmented { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; padding: 2px; gap: 2px; }
-.segmented button { border: 0; background: none; padding: 3px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.segmented button { border: 0; background: none; padding: 3px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; gap: 5px; }
 .segmented button.on { background: var(--accent); color: var(--accent-ink); }
 .cmp-stage { position: relative; background: var(--soft); border-radius: 8px; overflow: auto; flex: 1; min-height: 120px; padding: 8px; }
 .cmp-frame { position: relative; margin: 0 auto; width: 100%; }
