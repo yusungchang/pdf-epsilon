@@ -345,6 +345,7 @@ function renderFiles() {
   const nav = $("files");
   nav.hidden = state.files.length === 0;
   $("drop").classList.toggle("compact", state.files.length > 0);
+  renderSaveButton();
   nav.replaceChildren(...state.files.map((f, i) => {
     const chip = el("div", `file${i === state.current ? " on" : ""}`);
     chip.dataset.index = i;
@@ -567,9 +568,9 @@ function renderSaveButton() {
   const all = $("save-all");
   all.hidden = ready.length < 2 && !state.batch;
   all.disabled = !!state.batch || ready.some((x) => x.saving);
-  all.textContent = state.batch
+  rich(all, state.batch
     ? t("save.allProgress", { current: Math.min(state.batch.done + 1, state.batch.total), total: state.batch.total })
-    : t("save.all", { count: ready.length });
+    : t("save.all", { count: ready.length, preset: settingsLabel() }));
 }
 
 async function saveCopy() {
@@ -578,9 +579,9 @@ async function saveCopy() {
 }
 
 // Saves one file with the current settings, showing progress; it can be stopped until writing
-// begins. A signed file asks first.
-async function saveFile(f) {
-  if (f.analysis.file.signed) {
+// begins. A signed file asks first, unless Save all already asked about it.
+async function saveFile(f, { askedAboutSignature = false } = {}) {
+  if (f.analysis.file.signed && !askedAboutSignature) {
     const go = await ask(`${basename(f.path)}\n\n${t("save.signed.message")}`,
       { title: t("save.signed.title"), kind: "warning", okLabel: t("save.signed.ok"), cancelLabel: t("save.signed.cancel") });
     if (!go) return;
@@ -611,16 +612,26 @@ async function saveFile(f) {
   renderSaveButton();
 }
 
-// Saves every analysed file with the current settings, one after another.
+// Saves every analysed file with the current settings, one after another. It writes files the
+// owner may not have looked at, with settings chosen on another file, so it asks once first:
+// how many, with which settings, where to, and how many lose a signature.
 async function saveAll() {
   const files = state.files.filter((f) => f.status === "ready" && !f.saving);
   if (!files.length) return;
+  const count = files.length;
+  const signed = files.filter((f) => f.analysis.file.signed).length;
+  const where = state.outputDir ? t("save.allConfirm.folder", { folder: state.outputDir }) : t("save.allConfirm.nextTo");
+  const message = [t("save.allConfirm.message", { preset: settingsLabel(), where })];
+  if (signed) message.push(t("save.allConfirm.signed", { count: signed }));
+  const go = await ask(message.join("\n\n"),
+    { title: t("save.allConfirm.title", { count }), kind: "warning", okLabel: t("save.allConfirm.ok", { count }), cancelLabel: t("action.cancel") });
+  if (!go) return;
   state.batch = { done: 0, total: files.length };
   renderSaveButton();
   for (const f of files) {
     if (!f.removed && f.status === "ready") {
       if (state.files[state.current] !== f) select(state.files.indexOf(f));
-      await saveFile(f);
+      await saveFile(f, { askedAboutSignature: true });
     }
     state.batch.done += 1;
     renderSaveButton();

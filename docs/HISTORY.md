@@ -18,7 +18,7 @@
 | 0.9.1 | 2026-10-24 | Comparison of cloud files fixed; preset names as tags; version shown; Korean labels; full regression against 0.6.0. |
 | 0.10.0 | 2026-10-24 | Faster: images on every core, a SIMD resizer, shared work in analyses, a lookup table in the operation count; memory sized to the computer. Analysis 1.8×, saving 2.0× against 0.9.0. |
 | 0.11.0 | 2026-10-25 | Released as a minor version at the owner's request (built locally as 0.10.1). Comparison pictures no longer lost when they arrive after the reply (the cause of "could not be rendered", worst at 2× and 4×). "Details" starts closed; no focus ring on the comparison's close button when it opens. |
-| 0.11.1 | 2026-10-25 | One "Compare pages" button above the page list instead of one per page; page arrows in the comparison moved into the toolbar as "‹ Page 3 of 12 ›", with the arrow keys; zoom icons; "Only pages with issues" in the comparison. |
+| 0.11.1 | 2026-10-25 | One "Compare pages" button above the page list instead of one per page; page arrows in the comparison moved into the toolbar as "‹ Page 3 of 12 ›", with the arrow keys; zoom icons; "Only pages with issues" in the comparison; page control at the bottom; "Save all" moved to the file list and confirms first. |
 | 0.5.0 | 2026-10-21 | 0.4.1 released as a minor version at the owner's request; first-launch steps shown on every download; security review. |
 | 0.4.1 | 2026-10-21 | Long file names truncate on every WebKit, a round handle on the comparison divider, glass-finish icon, a product page on GitHub Pages, findings and pages folded under Advanced. |
 
@@ -54,6 +54,23 @@
 
 **The comparison's page control moved to the bottom centre,** directly under the page, at the owner's
 request; the toolbar above keeps only the view, zoom and differences controls.
+
+**"Save all" moved to the file list and asks first, at the owner's request.**
+
+- *Problem:* "Save all (3)" sat in one file's report, beside that file's "Save smaller copy", styled as
+  the lesser button. Yet it is the bigger step: it applies settings chosen while looking at one file to
+  every analysed file, including files never looked at or compared, and asked only about signed files,
+  one by one. Originals are never at risk (copies are always new files), but lossy copies of files nobody
+  checked are.
+- *Options offered:* move it to the file list with one confirmation (chosen); keep its place but rename
+  it and confirm; or put it in a menu on the save button.
+- *Now:* each report keeps only "Save smaller copy". The file row has "Save all 3 with [Balanced]…" at
+  its right end (the chips scroll beside it), shown when two or more files are ready. It asks once:
+  "Save smaller copies of 3 files?", saying which settings, where the copies go (next to each original or
+  the chosen folder), that originals are not changed, and how many files are signed and will lose a
+  valid signature. Confirming saves them all without asking again about each signed file. Text in
+  English and Korean (`save.all`, `save.allConfirm.*`).
+- *Tested:* `tests/locales.rs`; harness screenshots of the file row in both languages.
 
 ## 0.11.0, 25 October 2026
 
