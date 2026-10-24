@@ -972,7 +972,6 @@ async function openCompare(f, page) {
   close.type = "button";
   close.setAttribute("aria-label", t("compare.close"));
   close.onclick = () => dlg.close();
-  close.autofocus = true;
   let prepareTicket = null;
   dlg.onclose = () => {
     // Closing stops the smaller copy still being made.
@@ -985,6 +984,10 @@ async function openCompare(f, page) {
   const body = el("div", "cmp-body");
   dlg.replaceChildren(head, body);
   if (!dlg.open) dlg.showModal();
+  // Focus starts on the window, not the close button, which would show its focus ring as soon as
+  // it opens. Escape still closes it, and Tab moves to the buttons.
+  dlg.tabIndex = -1;
+  dlg.focus();
   // The page behind does not scroll (or show its scroll bar) while the window is open.
   document.documentElement.classList.add("modal-open");
 

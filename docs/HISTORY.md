@@ -17,7 +17,7 @@
 | 0.9.0 | 2026-10-24 | Save all, Open With and Dock drops, Cancel and save progress, and the interface fixes from the 1.0 review. |
 | 0.9.1 | 2026-10-24 | Comparison of cloud files fixed; preset names as tags; version shown; Korean labels; full regression against 0.6.0. |
 | 0.10.0 | 2026-10-24 | Faster: images on every core, a SIMD resizer, shared work in analyses, a lookup table in the operation count; memory sized to the computer. Analysis 1.8×, saving 2.0× against 0.9.0. |
-| 0.10.1 | 2026-10-24 | Comparison pictures no longer lost when they arrive after the reply (the cause of "could not be rendered", worst at 2× and 4×). "Details" starts closed. |
+| 0.10.1 | 2026-10-24 | Comparison pictures no longer lost when they arrive after the reply (the cause of "could not be rendered", worst at 2× and 4×). "Details" starts closed; no focus ring on the comparison's close button when it opens. |
 | 0.5.0 | 2026-10-21 | 0.4.1 released as a minor version at the owner's request; first-launch steps shown on every download; security review. |
 | 0.4.1 | 2026-10-21 | Long file names truncate on every WebKit, a round handle on the comparison divider, glass-finish icon, a product page on GitHub Pages, findings and pages folded under Advanced. |
 
@@ -51,6 +51,11 @@
 **"Details" starts closed at every launch.** The section below the save button was closed at first but
 remembered once opened, so it kept reopening. It now always starts closed, and the stored setting
 (`moreOpen`) is removed (`ui/app.js`, `ui/index.html`).
+
+**No focus ring on the close button when the comparison opens.** The close button took focus on
+opening, so a half-clipped focus ring showed at once. Focus now starts on the window (Escape still
+closes it, Tab reaches the buttons), and the keyboard focus ring on the comparison's buttons is drawn
+inside them so the edge cannot clip it (`ui/app.js`, `ui/style.css`).
 
 ## 0.10.0, 24 October 2026
 
