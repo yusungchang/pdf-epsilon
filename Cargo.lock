@@ -1121,7 +1121,7 @@ dependencies = [
 
 [[package]]
 name = "epsilon"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "flate2",
  "image",
@@ -2927,7 +2927,7 @@ dependencies = [
 
 [[package]]
 name = "pdf-epsilon"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "epsilon",
  "hayro",

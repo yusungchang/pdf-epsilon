@@ -45,19 +45,68 @@ pub fn decode(stream: &Stream, limit: usize) -> Option<Vec<u8>> {
     if !stream.dict.has(b"Filter") {
         return (stream.content.len() <= limit).then(|| stream.content.clone());
     }
-    stream.decompressed_content_with_limit(limit).ok()
-}
-
-/// A page's content streams, joined, or `None` when any of them is over the limits.
-pub fn page_content(doc: &Document, page_id: ObjectId) -> Option<Vec<u8>> {
-    for id in doc.get_page_contents(page_id) {
-        if let Ok(Object::Stream(s)) = doc.get_object(id) {
-            if !params_ok(&s.dict) {
-                return None;
-            }
+    match decodable(&stream.dict)? {
+        Params::AsWritten => stream.decompressed_content_with_limit(limit).ok(),
+        Params::Unwrapped(p) => {
+            let mut dict = stream.dict.clone();
+            dict.set("DecodeParms", p);
+            Stream::new(dict, stream.content.clone()).decompressed_content_with_limit(limit).ok()
         }
     }
-    let content = doc.get_page_content_with_limit(page_id, CONTENT).ok()?;
+}
+
+/// How lopdf must be given a stream's `/DecodeParms` to decode it correctly.
+enum Params {
+    /// The dictionary is fine as it is.
+    AsWritten,
+    /// A one-filter stream whose parameters were written as `[<< … >>]`.
+    Unwrapped(Dictionary),
+}
+
+/// Whether lopdf decodes these filters and parameters to the right bytes. It reads
+/// `/DecodeParms` only as a direct dictionary and hands that one dictionary to every filter,
+/// and it treats a `/Filter` it cannot read as no filter at all. Anything it would get wrong
+/// returns `None`, so the stream is left exactly as it is:
+/// - a `/Filter` that is not a name or an array of names (a reference, for one);
+/// - parameters given by reference (resolving them needs the document);
+/// - parameters for a chain of filters, unless every entry is null.
+///
+/// Before this check, `[<< /Predictor 15 … >>]` was ignored and images came out scrambled.
+fn decodable(dict: &Dictionary) -> Option<Params> {
+    let filters = match dict.get(b"Filter") {
+        Err(_) => 0,
+        Ok(Object::Name(_)) => 1,
+        Ok(Object::Array(a)) if a.iter().all(|f| matches!(f, Object::Name(_))) => a.len(),
+        Ok(_) => return None,
+    };
+    match dict.get(b"DecodeParms") {
+        Err(_) | Ok(Object::Null) => Some(Params::AsWritten),
+        Ok(Object::Dictionary(_)) if filters == 1 => Some(Params::AsWritten),
+        Ok(Object::Array(a)) if a.len() == filters && a.iter().all(|p| matches!(p, Object::Null)) => Some(Params::AsWritten),
+        Ok(Object::Array(a)) if a.len() == 1 && filters == 1 => match &a[0] {
+            Object::Dictionary(p) => Some(Params::Unwrapped(p.clone())),
+            _ => None,
+        },
+        Ok(_) => None,
+    }
+}
+
+/// Whether `decode` can read this stream's filters and parameters. Used to report an image
+/// that is left alone for this reason, instead of it failing silently later.
+pub fn decodable_params(dict: &Dictionary) -> bool {
+    params_ok(dict) && decodable(dict).is_some()
+}
+
+/// A page's content streams, joined, or `None` when any of them is over the limits or cannot
+/// be decoded. (lopdf's own reader appends a stream's raw bytes when it fails to decode it,
+/// which would be read as drawing operations.)
+pub fn page_content(doc: &Document, page_id: ObjectId) -> Option<Vec<u8>> {
+    let mut content = Vec::new();
+    for id in doc.get_page_contents(page_id) {
+        let Ok(Object::Stream(s)) = doc.get_object(id) else { continue };
+        content.extend_from_slice(&decode(s, CONTENT.saturating_sub(content.len()))?);
+        content.push(b'\n');
+    }
     operations_ok(&content).then_some(content)
 }
 
@@ -177,6 +226,30 @@ mod tests {
     #[test]
     fn estimates_objects_before_loading() {
         assert_eq!(raw_object_estimate(b"1 0 obj\n<<>>\nendobj\n12 0 obj\n<< /Type /ObjStm /N 40 /First 9 >>"), 42);
+    }
+
+    #[test]
+    fn decodes_parameters_only_in_forms_lopdf_reads_correctly() {
+        let p = || dictionary! { "Predictor" => 12, "Columns" => 4 };
+        // Rows of 4 bytes with PNG "Up" prediction: the second row repeats the first.
+        let raw = vec![2u8, 1, 2, 3, 4, 2, 0, 0, 0, 0];
+        let stream = |parms: Object| {
+            use std::io::Write;
+            let mut z = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+            z.write_all(&raw).unwrap();
+            Stream::new(dictionary! { "Filter" => "FlateDecode", "DecodeParms" => parms }, z.finish().unwrap())
+        };
+        let want = Some(vec![1, 2, 3, 4, 1, 2, 3, 4]);
+        assert_eq!(decode(&stream(Object::Dictionary(p())), 64), want);
+        assert_eq!(decode(&stream(Object::Array(vec![Object::Dictionary(p())])), 64), want);
+        assert_eq!(decode(&stream(Object::Reference((9, 0))), 64), None);
+        let mut chain = stream(Object::Array(vec![Object::Null, Object::Dictionary(p())]));
+        chain.dict.set("Filter", vec![Object::Name(b"ASCIIHexDecode".to_vec()), Object::Name(b"FlateDecode".to_vec())]);
+        assert_eq!(decode(&chain, 64), None);
+        let mut by_reference = stream(Object::Null);
+        assert_eq!(decode(&by_reference, 64), Some(raw.clone()));
+        by_reference.dict.set("Filter", Object::Reference((9, 0)));
+        assert_eq!(decode(&by_reference, 64), None);
     }
 
     #[test]

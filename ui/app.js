@@ -774,6 +774,10 @@ function renderPage(f, compressed, page, width) {
 
 async function openCompare(f, page) {
   const dlg = $("compare");
+  // Each opening has its own number, so work still finishing for an earlier opening stops.
+  const session = (dlg.session = (dlg.session || 0) + 1);
+  const current = () => dlg.open && dlg.session === session;
+  let resizeWatch = null;
   const view = { page, zoom: 1, mode: "swipe", split: 50, diff: false, drawnFor: 0, aspect: 0 };
   const head = el("div", "cmp-head");
   const title = el("h3");
@@ -785,6 +789,8 @@ async function openCompare(f, page) {
     b.setAttribute("aria-label", t(key));
     b.title = t(key);
     b.onclick = () => { view.page += d; draw(); };
+    // Enabled once the page can be drawn.
+    b.disabled = true;
   }
   const close = el("button", "cmp-close", "×");
   close.type = "button";
@@ -792,7 +798,7 @@ async function openCompare(f, page) {
   close.onclick = () => dlg.close();
   close.autofocus = true;
   dlg.onclose = () => {
-    resizeWatch.disconnect();
+    resizeWatch?.disconnect();
     document.documentElement.classList.remove("modal-open");
   };
   nav.append(prev, next, close);
@@ -815,10 +821,12 @@ async function openCompare(f, page) {
   try {
     report = await invoke("prepare", { path: f.path, options: state.options, progress });
   } catch (e) {
+    if (!current()) return;
+    title.textContent = t("compare.pageTitle", { page, total: f.analysis.pages.length, settings: settingsLabel() });
     body.replaceChildren(el("p", "error", errorText(e)));
     return;
   }
-  if (!dlg.open) return;
+  if (!current()) return;
 
   const a = f.analysis;
   const total = a.pages.length;
@@ -883,7 +891,7 @@ async function openCompare(f, page) {
     const width = Math.min(4096, Math.round(view.drawnFor * (window.devicePixelRatio || 1) * view.zoom));
     const shownPage = view.page;
     const [before, after] = await Promise.all([renderPage(f, false, shownPage, width), renderPage(f, true, shownPage, width)]);
-    if (!dlg.open || view.page !== shownPage) return;
+    if (!current() || view.page !== shownPage) return;
     if (!before || !after) {
       scroller.replaceChildren(el("p", "error", t("compare.renderFailed")));
       return;
@@ -908,7 +916,7 @@ async function openCompare(f, page) {
       fr.prepend(base);
       scroller.replaceChildren(fr);
       const result = await differences(before, after);
-      if (!dlg.open || view.page !== shownPage || !view.diff) return;
+      if (!current() || view.page !== shownPage || !view.diff) return;
       if (result.blank) {
         note.textContent = t("compare.diffFailed");
         return;
@@ -1014,12 +1022,12 @@ async function openCompare(f, page) {
     scrollFrame = requestAnimationFrame(() => { view.recentreDivider?.(); view.placeKnob?.(); });
   }, { passive: true });
 
-  const resizeWatch = new ResizeObserver(() => {
+  resizeWatch = new ResizeObserver(() => {
     layout();
     view.placeKnob?.();
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
-      if (dlg.open && view.drawnFor && fitWidth() > view.drawnFor * 1.25) draw();
+      if (current() && view.drawnFor && fitWidth() > view.drawnFor * 1.25) draw();
     }, 250);
   });
   resizeWatch.observe(scroller);

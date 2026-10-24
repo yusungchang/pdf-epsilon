@@ -265,7 +265,15 @@ pub fn unsupported(doc: &Document, dict: &Dictionary, is_soft_mask: bool) -> Opt
     if pixels > crate::limits::IMAGE_PIXELS {
         return Some("tooLarge");
     }
+    // Parameters the decoder would misread (see `limits::decodable`), and JPEG parameters
+    // such as /ColorTransform, which the JPEG decoder does not take, change the pixels.
+    if !crate::limits::decodable_params(dict) {
+        return Some("unusualFilter");
+    }
     let filters = filters(dict);
+    if filters.as_slice() == [b"DCTDecode".to_vec()] && !matches!(dict.get(b"DecodeParms"), Err(_) | Ok(Object::Null)) {
+        return Some("unusualFilter");
+    }
     let is_jpeg = match filters.as_slice() {
         [] => false,
         [f] if f == b"DCTDecode" => true,
@@ -352,7 +360,9 @@ fn raw_image(data: &[u8], dict: &Dictionary, doc: &Document, space: Space, w: u3
         return None;
     }
     let len = w as usize * h as usize * space.channels();
-    if data.len() < len {
+    // Exactly the pixels, or at most one row more (some writers pad). More than that means the
+    // data was not decoded as its writer meant, for example a predictor left unapplied.
+    if data.len() < len || data.len() > len + w as usize * space.channels() {
         return None;
     }
     let data = data[..len].to_vec();

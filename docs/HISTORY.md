@@ -11,8 +11,66 @@
 | 0.4.0 | 2026-10-21 | Analysis progress, page thumbnails and before-and-after page comparison in an isolated renderer, removing files from the list, compact language button, theme button, icon tools for the page list. |
 | 0.6.0 | 2026-10-21 | Update check; damaged files are never half-copied; fuzzing and a public hostile corpus; security and privacy on the website. |
 | 0.6.1 | 2026-10-24 | Text audit of every screen in English and Korean; wording changes from the owner's review. |
+| 0.6.2 | 2026-10-24 | Three blockers from the 1.0 review fixed: scrambled predicted images, glyphs lost after `Q`, comparison window locking the page. |
 | 0.5.0 | 2026-10-21 | 0.4.1 released as a minor version at the owner's request; first-launch steps shown on every download; security review. |
 | 0.4.1 | 2026-10-21 | Long file names truncate on every WebKit, a round handle on the comparison divider, glass-finish icon, a product page on GitHub Pages, findings and pages folded under Advanced. |
+
+## 0.6.2, 24 October 2026
+
+The review before 1.0 (`docs/RELEASE-1.0.md`) found three blockers. Each was reproduced, given a test that
+failed, fixed, and checked again. The test files and harnesses live outside the repository.
+
+1. **Images whose decode parameters were an array or a reference came out as noise.**
+   - *Found:* lopdf applies `/DecodeParms` only when it is a direct dictionary (`lopdf object.rs:921`). The
+     form `[<< /Predictor 15 … >>]`, common after Ghostscript or iText, was ignored, so each row kept its
+     predictor byte. `raw_image` only checked that there were at least width × height × 3 bytes, so the
+     shifted rows were taken as pixels and re-encoded as JPEG. lopdf also hands one dictionary to every filter
+     in a chain, treats an unreadable `/Filter` (a reference) as no filter, and, for page content, appends a
+     stream's raw bytes when it cannot decode it. Fonts, CID maps and page content go through the same
+     decoder, so they were exposed too.
+   - *Tested:* a 600 × 400 RGB photo with Flate and PNG Sub prediction, in three files that differ only in
+     how `/DecodeParms` is written (direct, array, reference). Before the fix, Balanced output differed from
+     the original by 113.7 per channel on average (scrambled). The reviewer's files, rendered with
+     `mutool draw`, showed noise where the photo was.
+   - *Fix:* `limits::decode` now checks first whether lopdf would decode correctly. It unwraps
+     `[<< … >>]` for a single filter and refuses a `/Filter` that is not names, parameters by reference, and
+     parameters on a chain. Refused streams are left untouched, and images report "kept: unusual filter".
+     `page_content` decodes each content stream itself, and a page it cannot decode counts as unreadable.
+     `raw_image` now requires exactly the pixel bytes, plus at most one padding row. A JPEG with decode
+     parameters (such as `/ColorTransform 0`, which gave wrong colours) is left alone.
+   - *After:* direct and array forms are recompressed correctly (65.8% smaller, picture intact); the
+     reference form is kept as it is.
+2. **Font subsetting removed glyphs drawn after `Q`.**
+   - *Found:* the walker kept one "current font" that `Tf` overwrote. In PDF the font belongs to the
+     graphics state, so `Q` restores the font from before `q`. Text after `Q` was credited to the wrong
+     font, and the right font lost those glyphs. This happened even with Lossless. The `mutool draw -F txt`
+     check misses it, because the text is still in the file; only the glyph outlines are gone.
+   - *Tested:* two embedded TrueType fonts. F1 draws glyph 3; F2 is selected and used inside `q … Q`;
+     after `Q`, F1 draws glyph 5. Before the fix, F1 kept only glyph 3. The reviewer's file lost the word
+     "Wizard" on the page.
+   - *Fix:* `q` pushes the current font and `Q` pops it (`subset.rs`).
+   - *After:* F1 keeps 3 and 5, F2 keeps 4, and "Wizard" is drawn. That output is 98 KB instead of 43 KB:
+     the missing glyphs are back.
+3. **Closing the comparison while it was compressing locked the page.**
+   - *Found:* `onclose` called `resizeWatch.disconnect()`, but `resizeWatch` was declared only after the
+     compression finished. Closing earlier threw, `modal-open` stayed on the page, and the report could not
+     scroll. ‹ and › were live while compressing and threw too, and after an error the title still said
+     "Compressing…".
+   - *Tested:* two new scenes in the labelled screenshot harness. One opens a comparison whose
+     compression never finishes, presses ‹, closes, and records errors and the lock. The other makes
+     compression fail. Before the fix, both showed the page locked and a `ReferenceError`.
+   - *Fix:* `resizeWatch` is declared up front and checked before use. ‹ and › are disabled until the page
+     can be drawn. After an error, the title names the page. Each opening has its own number, so work
+     still finishing for an earlier opening is dropped.
+   - *After:* no errors and the page scrolls, in English and Korean; the normal comparison screens are
+     unchanged.
+
+**Checks.**
+- `tests/regressions.rs` holds the two engine cases, and `limits.rs` has a unit test for every form of
+  `/DecodeParms`. All tests pass.
+- The eight real test files were run through the engine before and after the fixes, with Lossless,
+  Balanced and Small (24 runs). Every output is byte-for-byte identical to before, and the text extracted
+  by mutool is identical to the original in every case.
 
 ## 0.6.1, 24 October 2026
 

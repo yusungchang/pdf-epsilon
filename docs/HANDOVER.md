@@ -1,7 +1,7 @@
 # Handover
 
 Where PDF Epsilon stands, what has been verified, and what to do next.
-Last updated 19 October 2026, at version 0.4.0.
+Last updated 24 October 2026, at version 0.6.2.
 
 ## The brief
 
@@ -119,7 +119,7 @@ truncated PDF both give a clear "not a readable PDF" message.
 - **CMYK and spot-colour images are untouched.** CMYK JPEGs with Adobe inversion need careful handling.
 - **Lossless images use no PNG predictors.** Adding them would make re-deflated graphics noticeably smaller.
 - **Encrypted PDFs cannot be processed.** A password prompt could open and re-encrypt them, but would need care with permissions.
-- **Progress is per file only.** There is no progress within a single large file.
+- **No progress while saving,** and no cancel for analysis, comparison or saving.
 - **Files are processed one at a time.**
 - **No "Open With" support.** Files dropped on the Dock icon or opened from Finder are not handled yet.
 - **Installers are not signed with a developer certificate.** The Mac app is ad-hoc signed, which is valid but
@@ -138,6 +138,10 @@ so `v0.4.0` is the first release to include it.
 
 ## Next steps
 
+0. **Release 1.0.0.** The owner wants to release 1.0.0 once the wrinkles are gone. `RELEASE-1.0.md` is the
+   working list: the review of 24 October 2026, with the blockers (fixed in 0.6.2), the should-fix items
+   for engine, shell and interface, and the unsupported features sorted into must, should and later.
+   Work through it in order and mark items fixed there as they land.
 1. **Owner decisions pending.** Email contact with users (optional, never required) was raised for 0.6.0 and
    left for later. Donations (GitHub Sponsors, Ko-fi, toss.me) were discussed and not built yet.
    Report the lopdf free-entry bug upstream (see HISTORY 0.6.0, item 3) once the owner agrees.

@@ -348,9 +348,23 @@ impl Usage {
             self.give_up = true;
             return;
         };
+        // The font is part of the graphics state: `q` saves it and `Q` brings it back.
+        // Text after `Q` is drawn with the font from before `q`, not the last `Tf`.
         let mut font: Option<ObjectId> = None;
+        let mut saved: Vec<Option<ObjectId>> = Vec::new();
         for op in &content.operations {
             let strings: Vec<&[u8]> = match op.operator.as_str() {
+                "q" => {
+                    saved.push(font);
+                    continue;
+                }
+                "Q" => {
+                    // An unmatched Q is ignored by viewers, and so here.
+                    if let Some(f) = saved.pop() {
+                        font = f;
+                    }
+                    continue;
+                }
                 "Tf" => {
                     font = op.operands.first().and_then(|o| o.as_name().ok()).and_then(|n| lookup(doc, resources, b"Font", n));
                     if let Some(id) = font {

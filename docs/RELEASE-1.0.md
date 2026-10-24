@@ -8,17 +8,19 @@ Severity: **blocker** loses content or breaks the app; **should** fix before 1.0
 
 ## Blockers
 
-1. **Images whose `/DecodeParms` is an array or a reference come out as noise.** lopdf reads only a direct
+All three fixed in 0.6.2; see `HISTORY.md` for how each was tested.
+
+1. **Fixed in 0.6.2.** **Images whose `/DecodeParms` is an array or a reference come out as noise.** lopdf reads only a direct
    dictionary, so the PNG predictor is skipped, the row bytes shift, and the scrambled pixels are re-encoded
    as JPEG. Common in files that went through Ghostscript or iText (`/DecodeParms [<< /Predictor 15 >>]`).
    `images.rs:194-198`, `raw_image` `images.rs:350-363`; the same applies to `/CIDToGIDMap` (`subset.rs:195`).
    Fix: resolve the reference and a one-element array, otherwise leave the image; require the decoded length
    to match width × height × components.
-2. **Font subsetting drops glyphs when a font is selected inside `q … Q`.** The current font is not restored at
+2. **Fixed in 0.6.2.** **Font subsetting drops glyphs when a font is selected inside `q … Q`.** The current font is not restored at
    `Q`, so text drawn after it is attributed to the wrong font and its glyphs are removed. Happens even with
    Lossless. `mutool draw -F txt` does not notice, because the text is still there; only the glyph is gone.
    `subset.rs:351-411`. Fix: keep a graphics-state stack for the font.
-3. **Closing the comparison while it is compressing locks the page.** `onclose` uses `resizeWatch` before it
+3. **Fixed in 0.6.2.** **Closing the comparison while it is compressing locks the page.** `onclose` uses `resizeWatch` before it
    is declared, throws, and the page behind stays unscrollable. ‹ and › also throw while preparing.
    `ui/app.js:794-797`, `:1017`, `:787`.
 
@@ -42,7 +44,7 @@ Severity: **blocker** loses content or breaks the app; **should** fix before 1.0
    and after; after subsetting, re-walk the output and check every used glyph is present; optionally a
    low-resolution render comparison of pages whose fonts or images changed (the renderer already exists).
 10. Smaller engine points:
-    - DCT images with `/ColorTransform 0` get wrong colours (`images.rs:181`).
+    - Fixed in 0.6.2: DCT images with `/ColorTransform 0` got wrong colours; JPEGs with decode parameters are now left alone.
     - Fonts used only by streams that aren't forms (JavaScript templates, appearances without `/Subtype`) can
       be subset away (`subset.rs:282-291`).
     - Barcodes and QR codes can be downsampled until they stop scanning.
