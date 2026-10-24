@@ -56,29 +56,29 @@ All three fixed in 0.6.2; see `HISTORY.md` for how each was tested.
 
 ## Should fix: desktop shell
 
-11. **The renderer's 1 GB memory cap does not cap memory.** It counts live heap, but a 5.6 MB file with large
+11. **Fixed in 0.8.0.** **The renderer's 1 GB memory cap does not cap memory.** It counts live heap, but a 5.6 MB file with large
     images reached 5.3 GB resident. `SECURITY.md` claims otherwise. `main.rs:21-85`. Watch the child's resident
     memory from the parent and kill it above the limit; on Linux, add `RLIMIT_AS`, and on Windows a Job Object
     limit.
-12. **There is no limit on renderer processes at once, and none are cancelled.** Each compared page starts two,
+12. **Fixed in 0.8.0.** **There is no limit on renderer processes at once, and none are cancelled.** Each compared page starts two,
     and fast scrolling started 17 thumbnail renders. `main.rs:250-275`, `app.js:568-590`. Run one or two at a
     time; drop requests no longer wanted.
-13. **The renderer hitting its cap aborts and writes a macOS crash report** (22 found in DiagnosticReports).
+13. **Fixed in 0.8.0.** **The renderer hitting its cap aborts and writes a macOS crash report** (22 found in DiagnosticReports).
     Exit quietly instead (`main.rs:43`).
-14. **Renderer children can outlive the app** until their page finishes (`render.rs:48-93`). Add a watchdog.
-15. **Changing the original after comparing saves the old content.** The prepared copy and the analysis are
+14. **Fixed in 0.8.0.** **Renderer children can outlive the app** until their page finishes (`render.rs:48-93`). Add a watchdog.
+15. **Fixed in 0.8.0.** **Changing the original after comparing saves the old content.** The prepared copy and the analysis are
     keyed by path and settings only. `main.rs:171-200, 281`. Add size and modified time to the key.
-16. **The prepared cache holds up to three full copies** (up to 6 GB) (`main.rs:180`). Cap by bytes.
-17. **No thumbnails or comparison for files over about 0.5–1 GB;** the child fails to parse them
+16. **Fixed in 0.8.0.** **The prepared cache holds up to three full copies** (up to 6 GB) (`main.rs:180`). Cap by bytes.
+17. **Fixed in 0.8.0.** **No thumbnails or comparison for files over about 0.5–1 GB;** the child fails to parse them
     (`render.rs:50-65`). Say so instead of showing blanks.
-18. **Save errors are all "Could not read or write the file"**, with an English OS message even in Korean:
+18. **Fixed in 0.8.0.** **Save errors are all "Could not read or write the file"**, with an English OS message even in Korean:
     - a removed output folder (remembered, so every save then fails);
     - a read-only volume;
     - names too long (a long Korean name plus `-epsilon.pdf` on Linux).
 
     Add codes for not found, permission and read-only, shorten long names, and check the remembered folder
     at start.
-19. Smaller shell points:
+19. **Fixed in 0.8.0.** Smaller shell points:
     - Outputs are not written atomically, so cloud sync can upload a half-written file.
     - The download-quarantine marker is not carried over.
     - The `file_size` command is unused.

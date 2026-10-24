@@ -276,6 +276,10 @@
 
   "error.notPrepared": "The compressed version is no longer ready. Open the comparison again.",
   "error.io": "Could not read or write the file.",
+  "error.fileMissing": "The file is no longer where it was. It may have been moved, renamed or deleted.",
+  "error.folderMissing": "The folder chosen for saving is no longer there. Saving goes next to the original from now on; try again.",
+  "error.notWritable": "PDF Epsilon cannot write to this folder. Choose another folder for saving.",
+  "error.tooLargeToShow": "This file is too large to show here. Saving still works.",
   "error.parse": "This does not look like a readable PDF.",
   "error.encrypted": "Encrypted PDFs are not supported yet.",
   "error.tooLarge": "The file is too large for PDF Epsilon (over 2 GB).",

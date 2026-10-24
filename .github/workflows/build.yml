@@ -38,6 +38,15 @@ jobs:
       # Run the hostile files through the decoder that ships too.
       - name: Hostile files with the app's Flate decoder
         run: cargo test -p epsilon --release --features flate2/zlib-rs --test hostile
+      # The app shell: saving, the renderer's limits (memory, processes at once, cancelling).
+      # Also the first place the Windows-only code is compiled.
+      - name: Linux system libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev
+      - name: App shell tests
+        run: cargo test -p pdf-epsilon --release
 
   bundle:
     if: github.event_name != 'pull_request'

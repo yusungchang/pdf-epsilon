@@ -1,7 +1,7 @@
 # Handover
 
 Where PDF Epsilon stands, what has been verified, and what to do next.
-Last updated 24 October 2026, at version 0.7.0.
+Last updated 24 October 2026, at version 0.8.0.
 
 ## The brief
 

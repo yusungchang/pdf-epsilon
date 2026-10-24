@@ -490,6 +490,12 @@ async function saveCopy() {
     f.saved = await invoke("compress", { job: { input: f.path, outputDir: state.outputDir, options: state.options } });
   } catch (e) {
     f.saved = { error: e };
+    // The chosen folder is gone: go back to saving next to the original, so the next try works.
+    if (e && e.code === "folderMissing" && state.outputDir) {
+      state.outputDir = null;
+      renderSettings();
+      persist();
+    }
   }
   btn.disabled = false;
   btn.textContent = t("save.button");
@@ -563,18 +569,22 @@ const thumbObserver = new IntersectionObserver((entries) => {
     if (e.isIntersecting) wantThumb(f, Number(e.target.dataset.thumb));
   }
 }, { rootMargin: "400px" });
-let thumbTimer = null;
 
+// Each file asks for one batch at a time; pages that scroll into view meanwhile wait for the
+// next. Thumbnails of another file cancel the batch in progress (the app keeps only the newest
+// request of each kind), and those pages are asked for again when they come back into view.
 function wantThumb(f, page) {
   if (f.thumbs.has(page) || f.thumbsWanted.has(page)) return;
   f.thumbsWanted.add(page);
-  clearTimeout(thumbTimer);
-  thumbTimer = setTimeout(() => fetchThumbs(f), 120);
+  clearTimeout(f.thumbTimer);
+  f.thumbTimer = setTimeout(() => fetchThumbs(f), 120);
 }
 
 async function fetchThumbs(f) {
+  if (f.thumbsBusy) return;
   const pages = [...f.thumbsWanted].filter((p) => !f.thumbs.has(p)).slice(0, THUMB_BATCH);
   if (!pages.length) return;
+  f.thumbsBusy = true;
   for (const p of pages) f.thumbs.set(p, undefined); // requested
   const each = new Channel();
   each.onmessage = ({ page, png }) => {
@@ -582,10 +592,23 @@ async function fetchThumbs(f) {
     f.thumbsWanted.delete(page);
     if (isCurrent(f)) document.querySelectorAll(`[data-thumb="${page}"]`).forEach((slot) => fillThumb(slot, f, page));
   };
+  let finished = true;
   try {
-    await invoke("render", { path: f.path, options: null, pages, width: THUMB_WIDTH, each });
+    finished = (await invoke("render", { path: f.path, options: null, pages, width: THUMB_WIDTH, kind: "thumbnails", each })) !== false;
   } catch { /* thumbnails are optional */ }
-  for (const p of pages) if (f.thumbs.get(p) === undefined) f.thumbs.set(p, null);
+  f.thumbsBusy = false;
+  for (const p of pages) {
+    if (f.thumbs.get(p) !== undefined) continue;
+    if (finished) {
+      f.thumbs.set(p, null);
+      f.thumbsWanted.delete(p);
+    } else {
+      // Cancelled: not drawn, not failed. Asked for again when the page is next in view.
+      f.thumbs.delete(p);
+      f.thumbsWanted.delete(p);
+    }
+  }
+  if (!finished && isCurrent(f)) renderPages(f.analysis);
   if (f.thumbsWanted.size) fetchThumbs(f);
 }
 
@@ -758,16 +781,21 @@ function settingsLabel() {
   return state.custom ? t("compare.custom") : presetName(state.preset);
 }
 
+// A page as a PNG data URL, null when it could not be drawn, or "tooLarge" for a file too
+// large to draw. Each side keeps only its newest request: turning pages quickly cancels the
+// pages left behind. Only drawn pages are remembered, so a failure is tried again next time.
 function renderPage(f, compressed, page, width) {
   const key = `${compressed ? JSON.stringify(state.options) : "original"}|${page}|${width}`;
   f.renders = f.renders || new Map();
   if (!f.renders.has(key)) {
-    f.renders.set(key, new Promise((resolve) => {
+    const drawing = new Promise((resolve) => {
       const each = new Channel();
       each.onmessage = ({ png }) => resolve(png ? `data:image/png;base64,${png}` : null);
-      invoke("render", { path: f.path, options: compressed ? state.options : null, pages: [page], width, each })
-        .catch(() => resolve(null));
-    }));
+      invoke("render", { path: f.path, options: compressed ? state.options : null, pages: [page], width, kind: compressed ? "compare-after" : "compare-before", each })
+        .then(() => resolve(null), (e) => resolve(e && e.code === "tooLargeToShow" ? "tooLarge" : null));
+    });
+    f.renders.set(key, drawing);
+    drawing.then((src) => { if (!src || src === "tooLarge") f.renders.delete(key); });
   }
   return f.renders.get(key);
 }
@@ -892,6 +920,10 @@ async function openCompare(f, page) {
     const shownPage = view.page;
     const [before, after] = await Promise.all([renderPage(f, false, shownPage, width), renderPage(f, true, shownPage, width)]);
     if (!current() || view.page !== shownPage) return;
+    if (before === "tooLarge" || after === "tooLarge") {
+      scroller.replaceChildren(el("p", "hint", t("error.tooLargeToShow")));
+      return;
+    }
     if (!before || !after) {
       scroller.replaceChildren(el("p", "error", t("compare.renderFailed")));
       return;

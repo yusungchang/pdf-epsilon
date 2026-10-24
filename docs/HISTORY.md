@@ -13,8 +13,80 @@
 | 0.6.1 | 2026-10-24 | Text audit of every screen in English and Korean; wording changes from the owner's review. |
 | 0.6.2 | 2026-10-24 | Three blockers from the 1.0 review fixed: scrambled predicted images, glyphs lost after `Q`, comparison window locking the page. |
 | 0.7.0 | 2026-10-24 | Every copy is checked (structure, letters, images); images sized where they are really drawn; `/UserUnit`; bounded form walks; less memory on big files; stale `/Prev` fixed. |
+| 0.8.0 | 2026-10-24 | Desktop shell: renderer memory really capped and quiet, two at a time and cancellable; saving never writes an outdated copy; clear save errors; safe writing. |
 | 0.5.0 | 2026-10-21 | 0.4.1 released as a minor version at the owner's request; first-launch steps shown on every download; security review. |
 | 0.4.1 | 2026-10-21 | Long file names truncate on every WebKit, a round handle on the comparison divider, glass-finish icon, a product page on GitHub Pages, findings and pages folded under Advanced. |
+
+## 0.8.0, 24 October 2026
+
+The desktop-shell items of the 1.0 review (`RELEASE-1.0.md`, items 11 to 19). The engine is unchanged.
+
+1. **The renderer's memory limit now holds** (`render.rs`, `main.rs`).
+   - *Found:* the renderer counted its live heap and refused allocations past 1 GB, but memory it freed
+     was not always returned to the system. The reviewer's 22 MB file with twelve 12,000-pixel images
+     made it hold 5.3 GB (6 images: 2.6 GB), while the heap never passed 1 GB.
+   - *Fix:* a watchdog thread in the renderer checks its peak resident memory every 20 ms (`getrusage`
+     on macOS and Linux, `K32GetProcessMemoryInfo` on Windows) and ends the process past 1.5 GB.
+   - *After:* both files end at 1.6 GB in under 1.5 s, with blank thumbnails instead.
+2. **No more crash reports.** A refused allocation made Rust abort, and macOS kept a crash report for
+   each one (22 were found on the owner's Mac). The allocator and the watchdog now end the process
+   with `_exit` (`TerminateProcess` on Windows): exit code 4 or 3, no report. Before and after the
+   checks above, the number of reports stayed the same.
+3. **Renderers do not outlive the app.** The watchdog also ends the process 65 seconds after it
+   started, past the app's own 60-second batch limit.
+4. **Two renderers at a time, and old requests cancelled.**
+   - At most two renderer processes run at once; the rest wait.
+   - Each request names its kind: thumbnails, or one side of the comparison. A newer request of the
+     same kind cancels the older one, whether it is waiting or running, and the command returns
+     `false`.
+   - The interface asks for one batch of thumbnails at a time per file, with its own timer per file.
+     Before, a shared timer could leave a file's thumbnails blank for good.
+   - Pages cancelled before they were drawn are asked for again when they come back into view.
+   - A page that failed to draw is no longer remembered as failed, so it is tried again.
+   - Duplicate page numbers no longer stall a batch.
+5. **Saving never writes an outdated copy.** The compressed copy kept from the comparison is now
+   keyed by the file's size and modification time as well as its path and settings. If the file
+   changed on disk since, the copy is dropped and saving compresses the file as it is now.
+6. **The kept copies are capped at 512 MB together** (the newest always stays). Before, up to three
+   whole copies were kept, up to 6 GB with files near the 2 GB limit.
+7. **Files over 400 MB are not drawn.** Their thumbnails stay blank, and the comparison says
+   "This file is too large to show here. Saving still works." Before, files over about 1 GB showed
+   blank pages without a word.
+8. **Save errors say what went wrong, in the interface's language.** New error codes:
+   - `folderMissing`: the chosen folder is gone. The folder choice then goes back to "same folder as the
+     original", so trying again works.
+   - `notWritable`: no permission, or a read-only volume.
+   - `fileMissing`: the original was moved, renamed or deleted.
+
+   These no longer append the English system message. Names that would pass 240 bytes are shortened
+   at a character boundary: a long Korean name failed on Linux, where the limit is 255 bytes.
+9. **Copies are written safely.**
+   - Each copy is written to a hidden temporary file, then linked under its final name (a link never
+     replaces a file), so cloud sync never sees a half-written copy. Where links are not supported, it
+     is written in place as before.
+   - The macOS quarantine mark and the Windows Mark of the Web are carried over from the original,
+     since the copy keeps its scripts too.
+   - The unused `file_size` command is gone.
+10. **Tests.**
+    - The app shell has tests for the first time. Unit tests cover:
+      - shortening long names;
+      - writing next to earlier copies without overwriting them or leaving temporary files;
+      - each new error code (the read-only folder case on macOS and Linux only);
+      - an outdated copy being dropped;
+      - the 512 MB cap;
+      - at most two renderers at once, with a newer request cancelling older ones (running and waiting).
+    - An integration test runs the real renderer: it draws a plain page, and a page of six huge images
+      ends it with code 3 or 4.
+    - CI now runs these on all three platforms. That is also the first place the Windows-only code is
+      compiled, since this Mac has no Windows toolchain.
+11. **Checked.**
+    - The renderer on all 708 qpdf files gives output byte-for-byte identical to 0.7.0, at most 0.25 s
+      and 35 MB per file.
+    - On the hostile corpus: 791 MB at most, and no crash reports.
+    - On the eight real test files: every page drawn as before.
+    - In the interface harness: the missing-folder message with the folder choice reset, the
+      too-large message in the comparison, and thumbnails still loading.
+    - `npm run build` produces the app.
 
 ## 0.7.0, 24 October 2026
 

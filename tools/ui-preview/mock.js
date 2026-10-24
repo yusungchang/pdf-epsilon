@@ -32,7 +32,7 @@ window.__TAURI__ = {
       const set = args.width <= 300 ? (window.__THUMBS__ || {})[name] || {}
         : r.name !== name ? {} : args.options ? (big ? r.zoomedCompressed : r.compressed) : (big ? r.zoomed : r.original);
       for (const page of args.pages) { await wait(5); args.each.onmessage({ page, png: (set || {})[page] || null }); }
-      return null;
+      return true; // finished (false would mean cancelled by a newer request)
     }
     if (cmd === "prepare") {
       const a = analyses[args.path.split("/").pop()];
