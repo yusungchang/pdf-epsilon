@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PDF Epsilon</title>
+  <!-- Applies a saved Light or Dark choice before anything is drawn, so there is no flash. -->
+  <script src="theme-boot.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -38,6 +40,8 @@
       <span class="drop-title" data-i18n="drop.title"></span>
       <span class="drop-sub" data-i18n="drop.sub"></span>
     </button>
+
+    <p id="notice" class="notice" role="status" hidden></p>
 
     <nav id="files" class="files" data-i18n-label="files.label" hidden></nav>
 
@@ -101,7 +105,11 @@
             <span class="sep" data-i18n="save.or"></span>
             <button id="out-pick" class="link" type="button"></button>
           </div>
-          <button id="save" class="primary" type="button" data-i18n="save.button"></button>
+          <div class="save-buttons">
+            <button id="save-cancel" class="link" type="button" data-i18n="action.cancel" hidden></button>
+            <button id="save-all" class="secondary" type="button" hidden></button>
+            <button id="save" class="primary" type="button" data-i18n="save.button"></button>
+          </div>
         </div>
         <div id="save-result" class="save-result" hidden></div>
       </section>

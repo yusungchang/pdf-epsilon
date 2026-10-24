@@ -159,6 +159,12 @@ pub struct Report {
     pub fonts_restored: bool,
 }
 
+/// Stops work in progress: a progress callback raises it as a panic payload
+/// (`std::panic::panic_any(Cancelled)`), the engine passes it on, and the caller catches it
+/// with `std::panic::catch_unwind`. Work is only ever stopped between steps, and nothing is
+/// written, so stopping loses nothing.
+pub struct Cancelled;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("could not read the file: {0}")]
@@ -175,6 +181,8 @@ pub enum Error {
     Verify(String),
     #[error("{0} parts of the file could not be read, so it is left unchanged")]
     Damaged(usize),
+    #[error("something went wrong inside PDF Epsilon ({0})")]
+    Internal(String),
 }
 
 impl Error {
@@ -189,6 +197,7 @@ impl Error {
             Error::TooComplex => "tooComplex",
             Error::Verify(_) => "verify",
             Error::Damaged(_) => "damaged",
+            Error::Internal(_) => "internal",
         }
     }
 
@@ -196,7 +205,7 @@ impl Error {
     pub fn detail(&self) -> String {
         match self {
             Error::Io(e) => e.to_string(),
-            Error::Parse(d) | Error::Verify(d) => d.clone(),
+            Error::Parse(d) | Error::Verify(d) | Error::Internal(d) => d.clone(),
             Error::Damaged(n) => format!("{n} unreadable objects"),
             Error::Encrypted | Error::TooLarge | Error::TooComplex => String::new(),
         }

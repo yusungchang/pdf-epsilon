@@ -26,8 +26,11 @@ Before anything is changed, PDF Epsilon shows:
   across, side by side, or with every visibly changed pixel marked, at Fit, 2× or 4×, in a window
   you can resize. Saving afterwards writes exactly the version compared.
 - **Light, dark or system theme**, and English or Korean, from the two buttons at the top.
-- **Progress** while a file is analysed. Several files can be dropped at once; × takes one off
-  the list without touching the file.
+- **Progress** while a file is analysed and while it is saved, with **Cancel** for both.
+  Several files can be dropped at once; × takes one off the list (stopping its analysis)
+  without touching the file. **Save all** saves every analysed file with the current settings.
+- **Open With:** PDF Epsilon is offered for PDFs in Finder, Explorer and Linux file managers
+  (never as the default), and PDFs dropped on its Dock icon open in it.
 - **Warnings** for signed documents and PDF/A files.
 
 See [docs/ANALYZER.md](docs/ANALYZER.md) for how it works.
@@ -94,7 +97,11 @@ Every setting can be changed under **Advanced**.
   Word, browsers and most CJK documents embed them. Fonts that form fields can type with are
   left whole. Simple TrueType, Type 1 and CFF fonts are not subset yet.
 - **Some images are left as they are:** CMYK, indexed, spot colour, 1-bit and 16-bit
-  images, JPEG 2000, JBIG2 and CCITT.
+  images, JPEG 2000, JBIG2 and CCITT, inline images, and images over 100 megapixels.
+- **Files over 2 GB or about a million objects** are refused, and so are files part of which
+  cannot be read: they are never rewritten from a guess.
+- **Only files named `.pdf`** are taken; folders dropped on the window are not opened yet.
+- **Thumbnails and the comparison** are not drawn for files over 400 MB.
 
 ## Develop
 

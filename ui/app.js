@@ -138,6 +138,29 @@ const pct = (part, whole) => (whole ? (100 * part) / whole : 0);
 const formatPct = (p) => new Intl.NumberFormat(i18n.lang, { style: "percent", maximumFractionDigits: p < 10 ? 1 : 0 }).format(p / 100);
 const basename = (p) => p.split(/[\\/]/).pop();
 const presetName = (id) => t(`preset.${id}`);
+
+// Work the app can stop (analysis, a comparison copy, a save) carries a ticket.
+let lastTicket = 0;
+const newTicket = () => ++lastTicket;
+const cancelWork = (ticket) => { if (ticket) invoke("cancel", { ticket }).catch(() => {}); };
+
+// Re-renders that replace the focused element give focus back to its replacement, found by
+// its data-focus key, so keyboard users keep their place.
+function keepFocus(render) {
+  const key = document.activeElement?.dataset?.focus;
+  render();
+  if (key) document.querySelector(`[data-focus="${CSS.escape(key)}"]`)?.focus();
+}
+
+// A short message under the drop area, gone after a few seconds.
+let noticeTimer = null;
+function notice(text) {
+  const n = $("notice");
+  n.textContent = text;
+  n.hidden = false;
+  clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(() => { n.hidden = true; }, 6000);
+}
 const presetIndex = () => PRESETS.indexOf(state.preset);
 
 // ---- settings ----
@@ -146,8 +169,10 @@ function choosePreset(id) {
   state.preset = id;
   state.custom = false;
   state.options = structuredClone(state.presets[id]);
-  renderSettings();
-  renderReport();
+  keepFocus(() => {
+    renderSettings();
+    renderReport();
+  });
   persist();
 }
 
@@ -187,9 +212,13 @@ function readAdvanced() {
     stripPrivateData: $("private").checked,
     stripMetadata: $("metadata").checked,
   };
+  const wasCustom = state.custom;
   state.custom = JSON.stringify(state.options) !== JSON.stringify(state.presets[state.preset]);
   renderSettings();
-  renderPresets();
+  // Findings and pages depend only on whether the settings are custom, not on their values:
+  // a slider dragged through 50 values must not rebuild thousands of page rows 50 times.
+  if (wasCustom !== state.custom) keepFocus(renderPresets);
+  else renderSaveButton();
   persist();
 }
 
@@ -201,7 +230,12 @@ function persist() {
 
 function addFiles(paths) {
   const pdfs = paths.filter((p) => /\.pdf$/i.test(p));
+  // Folders and other files are not read; say so rather than doing nothing.
+  const skipped = paths.length - pdfs.length;
+  if (skipped) notice(t("drop.skipped", { count: skipped }));
   if (!pdfs.length) return;
+  // Files dropped while the comparison is open join the list without changing the report behind it.
+  const comparing = $("compare").open;
   for (const path of pdfs) {
     let i = state.files.findIndex((f) => f.path === path);
     if (i < 0) {
@@ -210,10 +244,18 @@ function addFiles(paths) {
       state.files.push(f);
       i = state.files.length - 1;
       state.queue.push(f);
+    } else if (["ready", "error"].includes(state.files[i].status) && !state.files[i].saving) {
+      // Added again: analysed again, in case it changed or could not be read before.
+      const f = state.files[i];
+      invoke("forget", { path: f.path }).catch(() => {});
+      Object.assign(f, { status: "waiting", progress: 0, analysis: null, error: null, saved: null,
+                         thumbs: new Map(), thumbsWanted: new Set(), renders: new Map(), thumbsBusy: false });
+      state.queue.push(f);
     }
-    if (state.current < 0 || pdfs.length === 1) select(i);
+    if (!comparing && (state.current < 0 || pdfs.length === 1)) select(i);
   }
   renderFiles();
+  renderReport();
   pump();
 }
 
@@ -228,13 +270,15 @@ async function pump() {
     if (isCurrent(f)) renderReport();
     const progress = new Channel();
     progress.onmessage = (done) => { f.progress = done; showProgress(f); };
+    f.ticket = newTicket();
     try {
-      f.analysis = await invoke("analyze", { path: f.path, progress });
+      f.analysis = await invoke("analyze", { path: f.path, ticket: f.ticket, progress });
       f.status = "ready";
     } catch (e) {
       f.error = e;
       f.status = "error";
     }
+    f.ticket = null;
     // A file removed while it was being analysed is simply forgotten.
     if (f.removed) continue;
     renderFiles();
@@ -262,6 +306,8 @@ function removeFile(f) {
   const i = state.files.indexOf(f);
   if (i < 0) return;
   f.removed = true;
+  // An analysis in progress stops, so the next file's begins at once.
+  cancelWork(f.ticket);
   invoke("forget", { path: f.path }).catch(() => {});
   state.files.splice(i, 1);
   state.queue = state.queue.filter((q) => q !== f);
@@ -279,8 +325,10 @@ function select(i) {
   state.current = i;
   state.open.clear();
   state.shown = PAGE_BATCH;
-  renderFiles();
-  renderReport();
+  keepFocus(() => {
+    renderFiles();
+    renderReport();
+  });
   window.scrollTo({ top: 0 });
 }
 
@@ -294,21 +342,28 @@ function renderFiles() {
     const b = el("button", "file-pick");
     b.type = "button";
     b.title = f.path;
+    b.dataset.focus = `file:${f.path}`;
+    if (i === state.current) b.setAttribute("aria-current", "true");
     b.append(el("span", "file-name", basename(f.path)));
     let sub = "";
     if (f.status === "waiting") sub = t("files.waiting");
     else if (f.status === "analysing") sub = t("files.analysingPercent", { percent: formatPct(100 * f.progress) });
     else if (f.status === "error") sub = t("files.cantRead");
+    else if (f.saved?.output) sub = t("files.saved", { percent: formatPct(pct(f.saved.report.inputBytes - f.saved.report.outputBytes, f.saved.report.inputBytes)) });
+    else if (f.analysis.presets.every((p) => p.error)) sub = t("files.failed");
     else {
-      const best = Math.max(...f.analysis.presets.map((p) => f.analysis.file.bytes - p.outputBytes));
+      const best = Math.max(...f.analysis.presets.filter((p) => !p.error).map((p) => f.analysis.file.bytes - p.outputBytes));
       sub = best > 0 ? t("files.upTo", { percent: formatPct(pct(best, f.analysis.file.bytes)) }) : t("files.alreadyLean");
     }
-    b.append(el("span", `file-sub${f.status === "error" ? " error" : ""}`, sub));
+    const failed = f.status === "error" || (f.status === "ready" && !f.saved?.output && f.analysis.presets.every((p) => p.error));
+    b.append(el("span", `file-sub${failed ? " error" : ""}`, sub));
     b.onclick = () => select(i);
     const x = el("button", "file-remove", "×");
     x.type = "button";
     x.title = t("files.remove", { name: basename(f.path) });
     x.setAttribute("aria-label", x.title);
+    // A file being saved stays until its copy is written.
+    x.disabled = !!f.saving;
     x.onclick = () => removeFile(f);
     chip.append(b, x);
     return chip;
@@ -329,8 +384,12 @@ function renderReport() {
         status.append(el("strong", "", basename(f.path)), el("br"), el("span", "error", errorText(f.error)));
       } else {
         const head = el("div", "status-head");
-        head.append(el("span", "spinner"), el("span", "", t("status.analysing", { name: basename(f.path) })),
-          el("span", "progress-label", formatPct(100 * f.progress)));
+        const waiting = f.status === "waiting";
+        const stop = el("button", "link", t("action.cancel"));
+        stop.type = "button";
+        stop.onclick = () => removeFile(f);
+        head.append(el("span", "spinner"), el("span", "", t(waiting ? "status.waiting" : "status.analysing", { name: basename(f.path) })),
+          el("span", "progress-label", waiting ? "" : formatPct(100 * f.progress)), stop);
         const bar = el("div", "progress");
         const fill = el("span");
         fill.style.width = `${(100 * f.progress).toFixed(1)}%`;
@@ -356,6 +415,7 @@ function renderReport() {
   renderUsage(a);
   renderPresets();
   renderSaveResult(f);
+  renderSaveButton();
 }
 
 function renderWarnings(a) {
@@ -370,7 +430,10 @@ function renderWarnings(a) {
   if (unreadable.length) {
     const d = el("div", "warning");
     d.append(el("strong", "", t("warning.unreadable.title")),
-      el("span", "", ` ${t("warning.unreadable.detail", { count: unreadable.length, pages: unreadable.slice(0, 10).map(String) })}`));
+      el("span", "", ` ${t("warning.unreadable.detail", { count: unreadable.length, pages: [
+        ...unreadable.slice(0, 10).map(String),
+        ...(unreadable.length > 10 ? [t("found.morePages", { count: unreadable.length - 10 })] : []),
+      ] })}`));
     box.append(d);
   }
 }
@@ -417,12 +480,12 @@ function renderPresets() {
     const saved = total - p.outputBytes;
     const b = el("button", "preset");
     b.type = "button";
+    b.dataset.focus = `preset:${p.preset}`;
     b.setAttribute("role", "radio");
     b.setAttribute("aria-checked", String(p.preset === state.preset));
     b.append(el("span", "p-name", presetName(p.preset)));
     if (p.error) {
       b.append(el("span", "p-size error", t("presets.failed")));
-      b.title = p.error;
     } else if (saved <= 0) {
       b.append(el("span", "p-size", formatBytes(total)), el("span", "p-save none", t("presets.noSaving")));
     } else {
@@ -430,7 +493,8 @@ function renderPresets() {
     }
     const meter = el("span", "p-meter");
     const fill = el("span");
-    fill.style.width = `${Math.max(0, 100 - pct(saved, total))}%`;
+    // A failed preset has no size to show.
+    fill.style.width = p.error ? "0" : `${Math.max(0, 100 - pct(saved, total))}%`;
     meter.append(fill);
     b.append(meter);
     b.onclick = () => choosePreset(p.preset);
@@ -470,26 +534,60 @@ function renderSaveResult(f) {
       el("strong", "", basename(output)));
     const btn = el("button", "reveal", t(navigator.platform.startsWith("Mac") ? "save.revealMac" : "save.reveal"));
     btn.type = "button";
-    btn.onclick = () => revealItemInDir(output);
+    btn.onclick = () => revealItemInDir(output).catch(() => {
+      // Moved or deleted since it was saved.
+      box.replaceChildren(el("span", "error", t("error.fileMissing")));
+    });
     box.append(btn);
   }
 }
 
+// The save buttons for the current file: saving is per file, so another file's save does not
+// lock this one. "Save all" appears once two files are ready.
+function renderSaveButton() {
+  const f = state.files[state.current];
+  const btn = $("save");
+  if (f && f.status === "ready") {
+    const p = f.analysis.presets[presetIndex()];
+    btn.disabled = !!f.saving || !!state.batch || (!state.custom && !!p.error);
+    btn.textContent = !f.saving ? t("save.button")
+      : f.saveProgress > 0 ? t("save.savingPercent", { percent: formatPct(100 * f.saveProgress) }) : t("save.saving");
+    $("save-cancel").hidden = !f.saving || !!state.batch;
+  }
+  const ready = state.files.filter((x) => x.status === "ready");
+  const all = $("save-all");
+  all.hidden = ready.length < 2 && !state.batch;
+  all.disabled = !!state.batch || ready.some((x) => x.saving);
+  all.textContent = state.batch
+    ? t("save.allProgress", { current: Math.min(state.batch.done + 1, state.batch.total), total: state.batch.total })
+    : t("save.all", { count: ready.length });
+}
+
 async function saveCopy() {
   const f = state.files[state.current];
-  if (!f || f.status !== "ready") return;
+  if (f && f.status === "ready" && !f.saving) await saveFile(f);
+}
+
+// Saves one file with the current settings, showing progress; it can be stopped until writing
+// begins. A signed file asks first.
+async function saveFile(f) {
   if (f.analysis.file.signed) {
-    const go = await ask(t("save.signed.message"),
+    const go = await ask(`${basename(f.path)}\n\n${t("save.signed.message")}`,
       { title: t("save.signed.title"), kind: "warning", okLabel: t("save.signed.ok"), cancelLabel: t("save.signed.cancel") });
     if (!go) return;
   }
-  const btn = $("save");
-  btn.disabled = true;
-  btn.textContent = t("save.saving");
+  f.saving = true;
+  f.saveProgress = 0;
+  f.saveTicket = newTicket();
+  const refresh = () => { if (isCurrent(f)) renderSaveButton(); };
+  renderFiles();
+  refresh();
+  const progress = new Channel();
+  progress.onmessage = (done) => { f.saveProgress = done; refresh(); };
   try {
-    f.saved = await invoke("compress", { job: { input: f.path, outputDir: state.outputDir, options: state.options } });
+    f.saved = await invoke("compress", { job: { input: f.path, outputDir: state.outputDir, options: state.options }, ticket: f.saveTicket, progress });
   } catch (e) {
-    f.saved = { error: e };
+    f.saved = e && e.code === "cancelled" ? null : { error: e };
     // The chosen folder is gone: go back to saving next to the original, so the next try works.
     if (e && e.code === "folderMissing" && state.outputDir) {
       state.outputDir = null;
@@ -497,9 +595,29 @@ async function saveCopy() {
       persist();
     }
   }
-  btn.disabled = false;
-  btn.textContent = t("save.button");
-  if (state.files[state.current] === f) renderSaveResult(f);
+  f.saving = false;
+  f.saveTicket = null;
+  renderFiles();
+  if (isCurrent(f)) renderSaveResult(f);
+  renderSaveButton();
+}
+
+// Saves every analysed file with the current settings, one after another.
+async function saveAll() {
+  const files = state.files.filter((f) => f.status === "ready" && !f.saving);
+  if (!files.length) return;
+  state.batch = { done: 0, total: files.length };
+  renderSaveButton();
+  for (const f of files) {
+    if (!f.removed && f.status === "ready") {
+      if (state.files[state.current] !== f) select(state.files.indexOf(f));
+      await saveFile(f);
+    }
+    state.batch.done += 1;
+    renderSaveButton();
+  }
+  state.batch = null;
+  renderSaveButton();
 }
 
 function statusPill(x) {
@@ -660,7 +778,7 @@ function renderPages(a) {
   const more = $("more-pages");
   const remaining = pages.length - state.shown;
   more.hidden = remaining <= 0;
-  more.textContent = t("pages.more", { count: Math.min(PAGE_BATCH, remaining), remaining });
+  more.textContent = remaining <= PAGE_BATCH ? t("pages.rest", { count: remaining }) : t("pages.more", { count: PAGE_BATCH, remaining });
 }
 
 function pageRow(p, max, i, images, fonts) {
@@ -670,6 +788,7 @@ function pageRow(p, max, i, images, fonts) {
   const row = el("div", "page-row");
   row.setAttribute("role", "button");
   row.tabIndex = 0;
+  row.dataset.focus = `page:${p.number}`;
   row.setAttribute("aria-expanded", String(state.open.has(p.number)));
   row.onkeydown = (e) => { if ((e.key === "Enter" || e.key === " ") && e.target === row) { e.preventDefault(); row.onclick(); } };
   const bar = el("span", "p-bar");
@@ -693,7 +812,7 @@ function pageRow(p, max, i, images, fonts) {
   );
   row.onclick = () => {
     if (state.open.has(p.number)) state.open.delete(p.number); else state.open.add(p.number);
-    wrap.replaceWith(pageRow(p, max, i, images, fonts));
+    keepFocus(() => wrap.replaceWith(pageRow(p, max, i, images, fonts)));
   };
   wrap.append(row);
   if (state.open.has(p.number)) wrap.append(pageDetail(p, i, images, fonts));
@@ -739,7 +858,9 @@ function pageDetail(p, i, images, fonts) {
       const r = im.results[i];
       let after = t("image.unchanged");
       if (im.unsupported) after = t("image.kept", { reason: { term: `imageReason.${im.unsupported}` } });
-      else if (r && !state.custom) {
+      // Custom settings are measured only when saving.
+      else if (state.custom) after = t("image.custom");
+      else if (r) {
         after = r.downsampled
           ? t("image.downsampled", { width: r.width, height: r.height, size: { bytes: r.bytes } })
           : t("image.reencoded", { size: { bytes: r.bytes } });
@@ -796,6 +917,8 @@ function renderPage(f, compressed, page, width) {
     });
     f.renders.set(key, drawing);
     drawing.then((src) => { if (!src || src === "tooLarge") f.renders.delete(key); });
+    // Only the most recent pages are kept: each is a full-size picture.
+    while (f.renders.size > 24) f.renders.delete(f.renders.keys().next().value);
   }
   return f.renders.get(key);
 }
@@ -816,7 +939,8 @@ async function openCompare(f, page) {
     b.type = "button";
     b.setAttribute("aria-label", t(key));
     b.title = t(key);
-    b.onclick = () => { view.page += d; draw(); };
+    // Each page is drawn at its own proportions, not those of the page before.
+    b.onclick = () => { view.page += d; view.aspect = 0; draw(); };
     // Enabled once the page can be drawn.
     b.disabled = true;
   }
@@ -825,7 +949,10 @@ async function openCompare(f, page) {
   close.setAttribute("aria-label", t("compare.close"));
   close.onclick = () => dlg.close();
   close.autofocus = true;
+  let prepareTicket = null;
   dlg.onclose = () => {
+    // Closing stops the smaller copy still being made.
+    cancelWork(prepareTicket);
     resizeWatch?.disconnect();
     document.documentElement.classList.remove("modal-open");
   };
@@ -847,8 +974,11 @@ async function openCompare(f, page) {
   progress.onmessage = (done) => { fill.style.width = `${(100 * done).toFixed(1)}%`; };
   let report;
   try {
-    report = await invoke("prepare", { path: f.path, options: state.options, progress });
+    prepareTicket = newTicket();
+    report = await invoke("prepare", { path: f.path, options: state.options, ticket: prepareTicket, progress });
+    prepareTicket = null;
   } catch (e) {
+    prepareTicket = null;
     if (!current()) return;
     title.textContent = t("compare.pageTitle", { page, total: f.analysis.pages.length, settings: settingsLabel() });
     body.replaceChildren(el("p", "error", errorText(e)));
@@ -869,6 +999,8 @@ async function openCompare(f, page) {
     for (const [value, label] of items) {
       const b = el("button", value === current ? "on" : "", label);
       b.type = "button";
+      b.dataset.focus = `segment:${items.map(([v]) => v).join("/")}:${value}`;
+      b.setAttribute("aria-pressed", String(value === current));
       b.onclick = () => { set(value); draw(); };
       g.append(b);
     }
@@ -884,10 +1016,11 @@ async function openCompare(f, page) {
     const diffToggle = el("label", "cmp-check");
     const box = el("input");
     box.type = "checkbox";
+    box.dataset.focus = "compare:diff";
     box.checked = view.diff;
     box.onchange = () => { view.diff = box.checked; draw(); };
     diffToggle.append(box, ` ${t("compare.diff")}`);
-    toolbar.replaceChildren(
+    keepFocus(() => toolbar.replaceChildren(
       segmented([["swipe", t("compare.swipe")], ["side", t("compare.side")]], view.mode, (v) => { view.mode = v; }),
       // A new magnification centres the view and puts the divider in the middle of the screen.
       segmented(ZOOMS.map((z) => [z, z === 1 ? t("compare.zoomFit") : `${z}×`]), view.zoom, (v) => {
@@ -896,7 +1029,7 @@ async function openCompare(f, page) {
         view.recentre = true;
       }),
       diffToggle,
-    );
+    ));
 
     const lean = report.keptOriginal;
     const pageSaving = state.custom ? 0 : p.savings[presetIndex()];
@@ -904,7 +1037,7 @@ async function openCompare(f, page) {
       el("span", "", lean ? t("compare.lean") : t("compare.summaryFile", { settings: settingsLabel(), before: { bytes: report.inputBytes }, after: { bytes: report.outputBytes } })),
       el("span", "good", pageSaving > 0 ? t("compare.summaryPage", { size: { bytes: pageSaving } }) : ""),
     );
-    note.textContent = view.diff ? "" : t("compare.hint");
+    note.textContent = view.diff ? "" : t(view.mode === "side" ? "compare.hintSide" : "compare.hint");
 
     const waiting = el("p", "cmp-loading");
     waiting.append(el("span", "spinner"), ` ${t("compare.rendering")}`);
@@ -1093,6 +1226,8 @@ async function differences(beforeSrc, afterSrc) {
   let blank = false;
   try {
     for (let y0 = 0; y0 < height; y0 += rows) {
+      // Let the window breathe between strips: a 4× page is tens of millions of pixels.
+      if (y0) await new Promise((r) => setTimeout(r, 0));
       const h = Math.min(rows, height - y0);
       xb.clearRect(0, 0, width, rows);
       xa.clearRect(0, 0, width, rows);
@@ -1151,6 +1286,7 @@ function renderLanguagePicker() {
       renderSettings();
       renderFiles();
       renderReport();
+      renderSaveButton();
     };
     return item;
   }));
@@ -1163,10 +1299,12 @@ function renderLanguagePicker() {
       items();
       menu.hidden = false;
       button.setAttribute("aria-expanded", "true");
+      focusFirst(menu);
     }
   };
-  document.addEventListener("click", closeMenus);
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenus(); });
+  document.addEventListener("click", () => closeMenus());
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenus(true); });
+  menuKeys(menu);
 }
 
 // Line icons on a 16 × 16 grid, drawn with the current text colour.
@@ -1197,12 +1335,28 @@ function applyTheme(theme) {
   } catch { /* not available */ }
 }
 
-function closeMenus() {
+function closeMenus(returnFocus = false) {
   for (const [b, m] of [["update", "update-menu"], ["theme", "theme-menu"], ["language", "language-menu"]]) {
+    // Escape gives focus back to the button of the menu it closed.
+    if (returnFocus && !$(m).hidden) $(b).focus();
     $(m).hidden = true;
     $(b).setAttribute("aria-expanded", "false");
   }
 }
+
+// Arrow keys move between a menu's items; the first item takes focus when it opens.
+function menuKeys(menu) {
+  menu.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    const items = [...menu.querySelectorAll("button")];
+    if (!items.length) return;
+    e.preventDefault();
+    const at = items.indexOf(document.activeElement);
+    const next = e.key === "ArrowDown" ? (at + 1) % items.length : (at - 1 + items.length) % items.length;
+    items[next].focus();
+  });
+}
+const focusFirst = (menu) => requestAnimationFrame(() => menu.querySelector("button")?.focus());
 
 function renderThemePicker() {
   const button = $("theme");
@@ -1238,8 +1392,10 @@ function renderThemePicker() {
       items();
       menu.hidden = false;
       button.setAttribute("aria-expanded", "true");
+      focusFirst(menu);
     }
   };
+  menuKeys(menu);
   // Relabelled when the language changes.
   renderThemePicker.relabel = label;
 }
@@ -1347,7 +1503,9 @@ async function init() {
   renderSettings();
 
   for (const id of ["images-on", "dpi", "quality", "dedupe", "subset-fonts", "font-tables", "thumbs", "private", "metadata"]) {
-    $(id).addEventListener("input", readAdvanced);
+    // The resolution is read when it is done (Enter or leaving the field), so typing "300" is
+    // not corrected to the minimum after its first digit.
+    $(id).addEventListener(id === "dpi" ? "change" : "input", readAdvanced);
   }
   $("out-same").addEventListener("click", () => { state.outputDir = null; renderSettings(); persist(); });
   $("out-pick").addEventListener("click", async () => {
@@ -1355,6 +1513,8 @@ async function init() {
     if (dir) { state.outputDir = dir; renderSettings(); persist(); }
   });
   $("save").addEventListener("click", saveCopy);
+  $("save-all").addEventListener("click", saveAll);
+  $("save-cancel").addEventListener("click", () => cancelWork(state.files[state.current]?.saveTicket));
   document.querySelectorAll("[data-icon]").forEach((b) => b.prepend(icon(b.dataset.icon)));
   for (const id of ["only-issues", "largest"]) {
     $(id).addEventListener("click", () => {
@@ -1376,6 +1536,14 @@ async function init() {
     const files = await open({ multiple: true, title: t("dialog.choose"), filters: [{ name: t("dialog.pdf"), extensions: ["pdf", "PDF"] }] });
     if (files) addFiles(Array.isArray(files) ? files : [files]);
   });
+
+  // PDFs opened from outside: Open With, the Dock icon, or a second launch on Windows and Linux.
+  const takeOpened = async () => {
+    const paths = await invoke("take_opened").catch(() => []);
+    if (paths.length) addFiles(paths);
+  };
+  await window.__TAURI__.event.listen("files-opened", takeOpened);
+  takeOpened();
 
   await getCurrentWebview().onDragDropEvent((event) => {
     const { type, paths } = event.payload;

@@ -298,6 +298,14 @@ small { color: var(--muted); }
 .sep { opacity: .7; }
 .primary { border: 0; background: var(--accent); color: var(--accent-ink); font-weight: 600; border-radius: 8px; padding: 8px 16px; cursor: pointer; }
 .primary:disabled { opacity: .6; cursor: default; }
+.save-buttons { display: flex; align-items: center; gap: 10px; }
+.secondary { border: 1px solid var(--line); background: var(--panel); color: var(--ink); font-weight: 600; border-radius: 8px; padding: 7px 14px; cursor: pointer; }
+.secondary:hover:not(:disabled) { border-color: var(--accent); }
+.secondary:disabled { opacity: .6; cursor: default; }
+.notice { margin: 0; padding: 8px 12px; border-radius: 8px; background: var(--warn-bg); color: var(--warn); font-size: 13px; }
+.status-head .link { margin-left: 8px; }
+/* Messages people may want to copy into a bug report. */
+.status, .save-result, .warning, .update-menu, .notice { -webkit-user-select: text; user-select: text; }
 .save-result { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 13px; padding: 8px 10px; background: var(--soft); border-radius: 8px; }
 .save-result .reveal { margin-left: auto; }
 .reveal { border: 1px solid var(--line); background: var(--panel); border-radius: 7px; padding: 4px 10px; cursor: pointer; white-space: nowrap; }

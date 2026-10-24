@@ -85,26 +85,26 @@ All three fixed in 0.6.2; see `HISTORY.md` for how each was tested.
 
 ## Should fix: interface
 
-20. **The dpi field can't be typed into:** each keystroke is clamped and written back ("300" becomes 36, 360,
+20. **Fixed in 0.9.0.** **The dpi field can't be typed into:** each keystroke is clamped and written back ("300" becomes 36, 360,
     1200). `app.js:180`, `:162`. Clamp on blur.
-21. **Saving is global, not per file:** other files show "Saving…", a result is lost if its file is removed,
+21. **Fixed in 0.9.0.** **Saving is global, not per file:** other files show "Saving…", a result is lost if its file is removed,
     and changing language mid-save resets the label. `app.js:478-497`.
-22. **Failed renders are cached forever** (`app.js:765-770`, `:588`), and quickly switching files can leave
+22. **Fixed in 0.8.0.** **Failed renders are cached forever** (`app.js:765-770`, `:588`), and quickly switching files can leave
     thumbnails blank for good (one shared timer, `:566-573`).
-23. **Custom settings show "unchanged" for every image** in the page tables (`:711-728`).
-24. **When every preset fails, the chip says "already lean"**, Save stays enabled, and the card tooltip is English
+23. **Fixed in 0.9.0.** **Custom settings show "unchanged" for every image** in the page tables (`:711-728`).
+24. **Fixed in 0.9.0.** **When every preset fails, the chip says "already lean"**, Save stays enabled, and the card tooltip is English
     engine text (`:303`, `:423`).
-25. **Compare:**
+25. **Fixed in 0.9.0.** **Compare:**
     - a landscape page after a portrait one is drawn blurry (`:881`);
     - the side-by-side hint says "drag" (`:871`);
     - the hint mentions saving, but there is no Save button in the window.
-26. **Keyboard focus jumps to the top** after choosing a preset, file chip, page row or compare button.
-27. **No cancel, and no progress on Save.** Removing a file mid-analysis hides it, but the queue waits for it.
-28. **Dropping a folder or a non-PDF does nothing and says nothing** (`:203`).
-29. **Re-adding a file doesn't re-analyse it**, so a file that failed can't be retried without removing it first.
-30. **Large documents get slow:** a 5000-page file takes about 175 ms per quality-slider tick, and Expand all then
+26. **Fixed in 0.9.0.** **Keyboard focus jumps to the top** after choosing a preset, file chip, page row or compare button.
+27. **Fixed in 0.9.0.** **No cancel, and no progress on Save.** Removing a file mid-analysis hides it, but the queue waits for it.
+28. **Fixed in 0.9.0.** **Dropping a folder or a non-PDF does nothing and says nothing** (`:203`).
+29. **Fixed in 0.9.0.** **Re-adding a file doesn't re-analyse it**, so a file that failed can't be retried without removing it first.
+30. **Mostly fixed in 0.9.0** (slider no longer rebuilds the pages; render cache capped; jumping to a far page still renders the rows before it). **Large documents get slow:** a 5000-page file takes about 175 ms per quality-slider tick, and Expand all then
     jump takes 2.4 s. Render caches grow without a limit.
-31. Smaller interface points:
+31. **Fixed in 0.9.0,** except a fully fixed page's amber issue count and Save staying prominent on a lean file. Smaller interface points:
     - A waiting file shows "Analysing… 0%".
     - The unreadable-pages banner stops at 10 with no "and N more".
     - "Show in Finder" fails silently if the file has moved.
@@ -118,8 +118,8 @@ All three fixed in 0.6.2; see `HISTORY.md` for how each was tested.
 ## Not supported (decide: build, or say so)
 
 **Must for 1.0** (common, or the product looks broken without it):
-- **Save all.** Each file must be selected and saved one by one.
-- **Open With and file associations.** There is no Dock drop, no Finder or Explorer "Open with", and no
+- **Done in 0.9.0: Save all.** Each file must be selected and saved one by one.
+- **Done in 0.9.0: Open With and file associations.** There is no Dock drop, no Finder or Explorer "Open with", and no
   single-instance handling on Windows and Linux.
 - **A licence.** `UNLICENSED`, while the repo is public and the website says "Free to use".
 - **The homepage points to pdfepsilon.com, which is unregistered.** Use the github.io address until it is
@@ -132,7 +132,7 @@ All three fixed in 0.6.2; see `HISTORY.md` for how each was tested.
 **Should:**
 - Owner-password-only PDFs (opening needs no password; common for statements and e-books) are refused like
   fully encrypted ones.
-- Cancel for analysis, comparison and saving.
+- Done in 0.9.0: Cancel for analysis, comparison and saving.
 - Scans: 1-bit images, with no CCITT G4 or JBIG2 output (the top item in the size report).
 - CMYK, indexed, spot-colour and Lab images are untouched. Lossless JPEG Huffman optimisation is the safe
   route.
@@ -166,7 +166,7 @@ All three fixed in 0.6.2; see `HISTORY.md` for how each was tested.
 - "Not a word changes": checked by hand on the test files. The app checks page count only, and blocker 2 removes
   glyphs without changing the text.
 - PDF/A advice in the app (item 7).
-- The README's "Not yet supported" list is incomplete: it is missing Save all, Open With, the size and object
+- Done in 0.9.0: The README's "Not yet supported" list is incomplete: it is missing Save all, Open With, the size and object
   limits, damaged files, inline images, and that only `.pdf` names are accepted.
 - `SECURITY.md`: the renderer memory figures (item 11).
 

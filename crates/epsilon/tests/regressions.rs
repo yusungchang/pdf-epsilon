@@ -364,3 +364,26 @@ fn copies_do_not_point_at_the_originals_earlier_revisions() {
     assert!(Document::load_mem(&out).is_ok());
     assert!(!out.windows(5).any(|w| w == b"/Prev"));
 }
+
+// ---------- 6. stopping on request (0.9.0) ----------
+
+#[test]
+fn work_stops_on_request_and_says_so() {
+    use epsilon::{analyze_bytes_with_progress, compress_bytes_with_progress, Cancelled};
+    use std::panic::{catch_unwind, panic_any, set_hook, take_hook};
+    let input = placed_pdf(600, 400, None, true);
+    let stop = |f: f32| {
+        if f > 0.0 {
+            panic_any(Cancelled);
+        }
+    };
+    let quiet = take_hook();
+    set_hook(Box::new(|_| {}));
+    // Analysis runs the presets on threads at once; the request must come out as Cancelled,
+    // not as a crashed preset or a generic thread panic.
+    let analysis = catch_unwind(|| analyze_bytes_with_progress(&input, &stop));
+    let saving = catch_unwind(|| compress_bytes_with_progress(&input, &Preset::Balanced.options(), &stop));
+    set_hook(quiet);
+    assert!(analysis.err().is_some_and(|p| p.is::<Cancelled>()));
+    assert!(saving.err().is_some_and(|p| p.is::<Cancelled>()));
+}

@@ -354,7 +354,19 @@ pub fn analyze_bytes_with_progress(input: &[u8], progress: &(dyn Fn(f32) + Sync)
         let inspected = Inspector::new(input, &doc, tracker).inspect();
         let runs: Vec<Result<Run>> = handles
             .into_iter()
-            .map(|h| h.join().unwrap_or_else(|_| Err(Error::Verify("the preset run crashed".into()))))
+            .map(|h| h.join())
+            .collect::<Vec<_>>()
+            .into_iter()
+            .map(|joined| {
+                joined.unwrap_or_else(|payload| {
+                    // Every run is joined first. Stopping on request is then passed on; anything
+                    // else is a bug in that preset's run.
+                    if payload.is::<crate::Cancelled>() {
+                        std::panic::resume_unwind(payload);
+                    }
+                    Err(Error::Internal("the preset run crashed".into()))
+                })
+            })
             .collect();
         (runs, inspected)
     });

@@ -14,8 +14,99 @@
 | 0.6.2 | 2026-10-24 | Three blockers from the 1.0 review fixed: scrambled predicted images, glyphs lost after `Q`, comparison window locking the page. |
 | 0.7.0 | 2026-10-24 | Every copy is checked (structure, letters, images); images sized where they are really drawn; `/UserUnit`; bounded form walks; less memory on big files; stale `/Prev` fixed. |
 | 0.8.0 | 2026-10-24 | Desktop shell: renderer memory really capped and quiet, two at a time and cancellable; saving never writes an outdated copy; clear save errors; safe writing. |
+| 0.9.0 | 2026-10-24 | Save all, Open With and Dock drops, Cancel and save progress, and the interface fixes from the 1.0 review. |
 | 0.5.0 | 2026-10-21 | 0.4.1 released as a minor version at the owner's request; first-launch steps shown on every download; security review. |
 | 0.4.1 | 2026-10-21 | Long file names truncate on every WebKit, a round handle on the comparison divider, glass-finish icon, a product page on GitHub Pages, findings and pages folded under Advanced. |
+
+## 0.9.0, 24 October 2026
+
+The interface items of the 1.0 review (`RELEASE-1.0.md`, items 20 to 31) and two features the owner
+agreed are required for 1.0: Save all and Open With. Each change was checked in the labelled screenshot
+harness from the 0.6.1 text audit, in English and Korean (46 screens, 285 of 286 strings shown; the
+other appears only past 120 pages).
+
+1. **Cancel, and progress while saving.**
+   - *Engine:* `epsilon::Cancelled` stops work in progress. A progress callback raises it as a panic
+     payload, and the engine passes it on. When the presets run in parallel, every run is joined
+     first, so a stop is never mistaken for a crash.
+   - *Shell:* each analysis, comparison copy and save carries a ticket; `cancel(ticket)` makes its next
+     progress call stop. A real crash in a preset is now an internal error, not "failed
+     verification" (review item 10). A panic hook keeps stops out of the error output.
+   - *Interface:*
+     - Removing a file mid-analysis stops it, so the next file starts at once. The analysing box
+       has a Cancel link.
+     - Saving shows "Saving… 45%" with Cancel beside it.
+     - Closing the comparison stops its copy.
+   - *Tested:* an engine test stops an analysis (presets in parallel) and a save, and both come out as
+     `Cancelled`. In the harness, Cancel during a save showed "Saving… 24%", then the button came back
+     with nothing saved.
+2. **Save all.**
+   - Appears once two files are ready, and saves every analysed file with the current settings, one
+     after another ("Saving 2 of 3…").
+   - Saving is now per file: another file's save does not lock this one, and a file being saved
+     cannot be removed.
+   - A saved file's chip says "saved −71%". Signed files still ask first, naming the file.
+3. **Open With.**
+   - PDF Epsilon is declared a viewer of PDFs with rank Alternate, so it is offered in Finder,
+     Explorer and Linux file managers but never becomes the default. The bundle's `Info.plist`
+     shows `CFBundleTypeRole Viewer`, `LSHandlerRank Alternate`, `com.adobe.pdf`, and no exported
+     type.
+   - Files arrive four ways: on the command line at first launch, through the macOS Opened event
+     (Open With and Dock drops), and on Windows and Linux through `tauri-plugin-single-instance`,
+     which hands a second launch's files to the running app.
+   - The shell queues them and emits `files-opened`; the interface takes them at start and on each
+     event.
+   - *Tested on macOS with the built app:* a file opened while the app was closed, and another while
+     it was running, both reached the interface (checked with temporary logging, since removed).
+     Windows and Linux are compiled in CI but not yet tried by hand.
+4. **Interface fixes.**
+   - *Inputs and saving:*
+     - The dpi field is read when done (Enter or leaving it), not on each keystroke.
+     - Moving a slider no longer rebuilds the findings and pages unless the settings become custom or
+       stop being so.
+   - *Wrong or misleading displays:*
+     - With custom settings, the page tables say "measured when saved" under "With custom settings".
+     - When every preset failed, the chip says "couldn't compress", Save is disabled, failed presets
+       draw no meter, and their cards no longer carry English engine text.
+     - Each compared page is drawn at its own proportions, so a landscape page after a portrait one is
+       sharp.
+     - Side by side has its own hint.
+   - *Keyboard:*
+     - Focus stays on the preset, file chip, page row or comparison button you used.
+     - Menus open with focus on their first item, move with the arrow keys, and give focus back on
+       Escape.
+     - The current file chip is marked `aria-current`, and the comparison's toggles carry
+       `aria-pressed`.
+   - *Files:*
+     - Dropping folders or other files says how many were skipped.
+     - Adding a file again analyses it again: retrying a failed one, or picking up changes.
+     - A waiting file says "Waiting to analyse…".
+     - Files dropped while the comparison is open join the list without changing the report behind
+       it.
+   - *Messages:*
+     - The unreadable-pages banner adds "and N more" after ten pages.
+     - "Show in Finder" says when the copy is gone.
+     - The update check says "Couldn't check right now", which is also true when GitHub limits
+       requests.
+     - "Show 4 more of 4 remaining" became "Show the last 4 pages".
+   - *Smoothness:*
+     - Messages, warnings and results can be selected and copied.
+     - A small `theme-boot.js` applies a saved Light or Dark choice before the first paint, so there is
+       no flash.
+     - The comparison keeps only its 24 most recent page pictures.
+     - The difference check yields to the window between strips.
+5. **Not done:**
+   - Jumping to a far page still renders all the rows before it.
+   - A page whose issues are all fixed still shows its issue count in the "not handled yet" colour.
+   - A lean file still shows Save as the main button.
+6. **Minor release routine.**
+   - *Security review:* new inputs are file paths from the system (filtered to `.pdf`, made absolute)
+     and the ticket mechanism; no new parsing.
+   - *Hostile corpus:* the 23 files peak at 535 MB, as before.
+   - *Fuzzing:* 50,000 more inputs, with no panic, hang or crash, at most 303 MB.
+   - *Not re-run:* the qpdf corpus, since the engine's reading and writing are unchanged since 0.7.0
+     (only how a stop or a crash is reported).
+   - *Tests:* all engine and shell tests pass, and the app builds.
 
 ## 0.8.0, 24 October 2026
 

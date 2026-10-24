@@ -1,7 +1,7 @@
 # Handover
 
 Where PDF Epsilon stands, what has been verified, and what to do next.
-Last updated 24 October 2026, at version 0.8.0.
+Last updated 24 October 2026, at version 0.9.0.
 
 ## The brief
 
@@ -119,9 +119,7 @@ truncated PDF both give a clear "not a readable PDF" message.
 - **CMYK and spot-colour images are untouched.** CMYK JPEGs with Adobe inversion need careful handling.
 - **Lossless images use no PNG predictors.** Adding them would make re-deflated graphics noticeably smaller.
 - **Encrypted PDFs cannot be processed.** A password prompt could open and re-encrypt them, but would need care with permissions.
-- **No progress while saving,** and no cancel for analysis, comparison or saving.
 - **Files are processed one at a time.**
-- **No "Open With" support.** Files dropped on the Dock icon or opened from Finder are not handled yet.
 - **Installers are not signed with a developer certificate.** The Mac app is ad-hoc signed, which is valid but
   anonymous: macOS asks for confirmation on first launch (System Settings, Privacy & Security, Open Anyway).
   An app that says "damaged" has a broken signature; check with `codesign --verify --deep --strict`.
@@ -153,7 +151,7 @@ so `v0.4.0` is the first release to include it.
    subsetting; an opt-in to remove accessibility tags. Image cropping comes after these, once real files need it.
 4. **Analyzer improvements:** account for clipping paths in the visible share, rendered before-and-after comparison,
    and per-page thumbnails in the report.
-5. **App improvements:** "Open With" and Dock drops, a before-and-after page preview, and processing several files in parallel.
+5. **App improvements:** processing several files in parallel, and opening the PDFs in a dropped folder.
 
 ## How to check a change
 

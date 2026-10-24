@@ -7,7 +7,8 @@ use std::alloc::{GlobalAlloc, Layout, System};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -16,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use tauri::ipc::Channel;
-use tauri::State;
+use tauri::{Emitter, Manager, State};
 
 /// The system allocator, with an optional ceiling. The app runs without one; the thumbnail
 /// renderer process sets one at start, so a hostile PDF that makes the renderer allocate
@@ -151,6 +152,55 @@ fn internal(e: impl std::fmt::Display) -> Failure {
     Failure { code: "internal", detail: e.to_string() }
 }
 
+// ---- stopping work on request ----
+
+/// Work the interface may stop: each analysis, comparison copy or save has a ticket.
+#[derive(Default)]
+struct Tickets(Mutex<HashMap<u32, Arc<AtomicBool>>>);
+
+impl Tickets {
+    fn start(&self, ticket: Option<u32>) -> Arc<AtomicBool> {
+        let flag = Arc::new(AtomicBool::new(false));
+        if let (Some(t), Ok(mut map)) = (ticket, self.0.lock()) {
+            map.insert(t, flag.clone());
+        }
+        flag
+    }
+    fn end(&self, ticket: Option<u32>) {
+        if let (Some(t), Ok(mut map)) = (ticket, self.0.lock()) {
+            map.remove(&t);
+        }
+    }
+}
+
+/// Stops the work with this ticket. It ends at its next step with the error `cancelled`.
+#[tauri::command]
+fn cancel(ticket: u32, tickets: State<'_, Tickets>) {
+    if let Ok(map) = tickets.0.lock() {
+        if let Some(flag) = map.get(&ticket) {
+            flag.store(true, Ordering::Relaxed);
+        }
+    }
+}
+
+/// Raised from a progress callback when the work was cancelled (see `epsilon::Cancelled`).
+fn check(flag: &AtomicBool) {
+    if flag.load(Ordering::Relaxed) {
+        std::panic::panic_any(epsilon::Cancelled);
+    }
+}
+
+/// Runs engine work so that a cancellation, or a bug that panics, becomes an error message.
+fn guarded<T>(work: impl FnOnce() -> Result<T, Failure>) -> Result<T, Failure> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(work)).unwrap_or_else(|payload| {
+        if payload.is::<epsilon::Cancelled>() {
+            Err(Failure { code: "cancelled", detail: String::new() })
+        } else {
+            Err(internal("the work stopped unexpectedly"))
+        }
+    })
+}
+
 #[derive(Serialize)]
 struct PresetInfo {
     id: Preset,
@@ -169,10 +219,12 @@ fn presets() -> Vec<PresetInfo> {
 /// Explains where a file's bytes go and what each preset saves. Writes nothing.
 /// Progress, from 0 to 1, goes to `progress` at most every 50 ms and on every whole percent.
 #[tauri::command]
-async fn analyze(path: PathBuf, progress: Channel<f32>) -> Result<epsilon::Analysis, Failure> {
-    tauri::async_runtime::spawn_blocking(move || {
+async fn analyze(path: PathBuf, ticket: Option<u32>, progress: Channel<f32>, tickets: State<'_, Tickets>) -> Result<epsilon::Analysis, Failure> {
+    let stop = tickets.start(ticket);
+    let result = tauri::async_runtime::spawn_blocking(move || guarded(|| {
         let last = Mutex::new((Instant::now(), -1i32));
         let report = |done: f32| {
+            check(&stop);
             let percent = (done * 100.0) as i32;
             let Ok(mut last) = last.lock() else { return };
             if percent > last.1 && (last.0.elapsed() >= Duration::from_millis(50) || percent - last.1 >= 1) {
@@ -181,9 +233,11 @@ async fn analyze(path: PathBuf, progress: Channel<f32>) -> Result<epsilon::Analy
             }
         };
         epsilon::analyze_file_with_progress(&path, &report).map_err(reading)
-    })
+    }))
     .await
-    .map_err(internal)?
+    .map_err(internal)?;
+    tickets.end(ticket);
+    result
 }
 
 /// Compressed copies made for comparison, kept so that saving writes exactly what was
@@ -242,20 +296,29 @@ impl Prepared {
 
 /// Makes the compressed copy for the comparison window, with progress from 0 to 1.
 #[tauri::command]
-async fn prepare(path: PathBuf, options: Options, progress: Channel<f32>, prepared: State<'_, Prepared>) -> Result<Report, Failure> {
+async fn prepare(
+    path: PathBuf,
+    options: Options,
+    ticket: Option<u32>,
+    progress: Channel<f32>,
+    prepared: State<'_, Prepared>,
+    tickets: State<'_, Tickets>,
+) -> Result<Report, Failure> {
     if let Some((_, report)) = prepared.get(&path, &options) {
         let _ = progress.send(1.0);
         return Ok(report);
     }
     // Stamped before reading, so a change while compressing makes the copy stale, not wrong.
     let before = stamp(&path);
-    let (bytes, report) = {
+    let stop = tickets.start(ticket);
+    let made = {
         let path = path.clone();
         let options = options.clone();
-        tauri::async_runtime::spawn_blocking(move || -> Result<(Vec<u8>, Report), Failure> {
+        tauri::async_runtime::spawn_blocking(move || guarded(|| -> Result<(Vec<u8>, Report), Failure> {
             let input = epsilon::read_input(&path).map_err(reading)?;
             let last = Mutex::new(Instant::now());
             let report = |done: f32| {
+                check(&stop);
                 if let Ok(mut last) = last.lock() {
                     if last.elapsed() >= Duration::from_millis(50) || done >= 1.0 {
                         *last = Instant::now();
@@ -264,10 +327,12 @@ async fn prepare(path: PathBuf, options: Options, progress: Channel<f32>, prepar
                 }
             };
             Ok(epsilon::compress_bytes_with_progress(&input, &options, &report)?)
-        })
+        }))
         .await
-        .map_err(internal)??
+        .map_err(internal)?
     };
+    tickets.end(ticket);
+    let (bytes, report) = made?;
     prepared.put(path, &options, before, Arc::new(bytes), report.clone());
     Ok(report)
 }
@@ -327,22 +392,43 @@ async fn render(
 }
 
 /// Saves the smaller copy. When it was prepared for comparison with the same settings, that
-/// exact copy is written.
+/// exact copy is written. Progress, from 0 to 1, goes to `progress`; the ticket can stop it
+/// until writing begins.
 #[tauri::command]
-async fn compress(job: Job, prepared: State<'_, Prepared>) -> Result<Outcome, Failure> {
+async fn compress(
+    job: Job,
+    ticket: Option<u32>,
+    progress: Channel<f32>,
+    prepared: State<'_, Prepared>,
+    tickets: State<'_, Tickets>,
+) -> Result<Outcome, Failure> {
     let ready = prepared.get(&job.input, &job.options);
-    tauri::async_runtime::spawn_blocking(move || run(job, ready)).await.map_err(internal)?
+    let stop = tickets.start(ticket);
+    let result = tauri::async_runtime::spawn_blocking(move || run(job, ready, &stop, progress)).await.map_err(internal)?;
+    tickets.end(ticket);
+    result
 }
 
-fn run(job: Job, ready: Option<(Arc<Vec<u8>>, Report)>) -> Result<Outcome, Failure> {
+fn run(job: Job, ready: Option<(Arc<Vec<u8>>, Report)>, stop: &AtomicBool, progress: Channel<f32>) -> Result<Outcome, Failure> {
     let (out, report) = match ready {
         Some((bytes, report)) => (bytes, report),
-        None => {
+        None => guarded(|| {
             let input = epsilon::read_input(&job.input).map_err(reading)?;
-            let (out, report) = epsilon::compress_bytes(&input, &job.options)?;
-            (Arc::new(out), report)
-        }
+            let last = Mutex::new(Instant::now());
+            let report = |done: f32| {
+                check(stop);
+                if let Ok(mut last) = last.lock() {
+                    if last.elapsed() >= Duration::from_millis(50) || done >= 1.0 {
+                        *last = Instant::now();
+                        let _ = progress.send(done);
+                    }
+                }
+            };
+            let (out, report) = epsilon::compress_bytes_with_progress(&input, &job.options, &report)?;
+            Ok((Arc::new(out), report))
+        })?,
     };
+    // Past this point the copy is written whatever happens: stopping now would gain nothing.
     if report.kept_original {
         return Ok(Outcome { output: None, report });
     }
@@ -456,6 +542,42 @@ fn carry_download_mark(from: &Path, to: &Path) {
     let _ = (from, to);
 }
 
+// ---- files opened from outside: Open With, the Dock icon, a second launch ----
+
+/// PDFs handed to the app that the interface has not taken yet.
+#[derive(Default)]
+struct Opened(Mutex<Vec<PathBuf>>);
+
+/// PDFs among a launch's arguments, made absolute against `cwd`.
+fn pdf_arguments(args: impl IntoIterator<Item = std::ffi::OsString>, cwd: &Path) -> Vec<PathBuf> {
+    args.into_iter()
+        .map(PathBuf::from)
+        .filter(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("pdf")))
+        .map(|p| if p.is_absolute() { p } else { cwd.join(p) })
+        .collect()
+}
+
+/// Queues files for the interface and tells it to take them.
+fn hand_over(app: &tauri::AppHandle, paths: Vec<PathBuf>) {
+    if paths.is_empty() {
+        return;
+    }
+    if let Ok(mut q) = app.state::<Opened>().0.lock() {
+        q.extend(paths);
+    }
+    let _ = app.emit("files-opened", ());
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
+}
+
+/// The files handed to the app so far; the interface asks at start and on each `files-opened`.
+#[tauri::command]
+fn take_opened(opened: State<'_, Opened>) -> Vec<PathBuf> {
+    opened.0.lock().map(|mut q| std::mem::take(&mut *q)).unwrap_or_default()
+}
+
 fn main() {
     // The thumbnail renderer: the same executable, started by the app (see render.rs).
     let args: Vec<std::ffi::OsString> = std::env::args_os().collect();
@@ -466,13 +588,41 @@ fn main() {
         std::process::exit(render::child(&path, width));
     }
 
-    tauri::Builder::default()
+    // Stopping on request unwinds through the engine (see `check`); it is not an error to report.
+    let report_panic = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        if !info.payload().is::<epsilon::Cancelled>() {
+            report_panic(info);
+        }
+    }));
+
+    // Windows and Linux pass the files to open as arguments, to the first launch and to every
+    // later one; the single-instance plugin hands later ones to the running app. macOS sends
+    // an Opened event instead (below).
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let first = Opened(Mutex::new(pdf_arguments(args.into_iter().skip(1), &cwd)));
+
+    let builder = tauri::Builder::default();
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+        hand_over(app, pdf_arguments(argv.into_iter().skip(1).map(Into::into), Path::new(&cwd)));
+    }));
+    let app = builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(Prepared::default())
-        .invoke_handler(tauri::generate_handler![presets, analyze, prepare, render, forget, compress])
-        .run(tauri::generate_context!())
-        .expect("error while running PDF Epsilon");
+        .manage(Tickets::default())
+        .manage(first)
+        .invoke_handler(tauri::generate_handler![presets, analyze, prepare, render, forget, compress, cancel, take_opened])
+        .build(tauri::generate_context!())
+        .expect("error while starting PDF Epsilon");
+    app.run(|_app, _event| {
+        #[cfg(target_os = "macos")]
+        if let tauri::RunEvent::Opened { urls } = _event {
+            let paths = urls.into_iter().filter_map(|u| u.to_file_path().ok()).collect::<Vec<_>>();
+            hand_over(_app, paths.into_iter().filter(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("pdf"))).collect());
+        }
+    });
 }
 
 #[cfg(test)]
@@ -543,6 +693,13 @@ mod tests {
         std::fs::write(&file, b"second, longer version").unwrap();
         assert!(prepared.get(&file, &options).is_none());
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn only_pdfs_are_taken_from_the_launch_arguments() {
+        let cwd = Path::new("/Users/me/Documents");
+        let args = ["report.PDF", "/tmp/b.pdf", "--flag", "notes.txt", "folder"].map(std::ffi::OsString::from);
+        assert_eq!(pdf_arguments(args, cwd), vec![cwd.join("report.PDF"), PathBuf::from("/tmp/b.pdf")]);
     }
 
     #[test]

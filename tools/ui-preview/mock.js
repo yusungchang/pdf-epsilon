@@ -40,7 +40,8 @@ window.__TAURI__ = {
       const p = a.presets.find((x) => x.preset === "balanced");
       return { inputBytes: a.file.bytes, outputBytes: p.outputBytes, keptOriginal: p.keptOriginal };
     }
-    if (cmd === "forget") return null;
+    if (cmd === "forget" || cmd === "cancel") return null;
+    if (cmd === "take_opened") return [];
     if (cmd === "compress") {
       const a = analyses[args.job.input.split("/").pop()];
       const p = a.presets.find((x) => x.preset === "balanced");
@@ -52,6 +53,7 @@ window.__TAURI__ = {
   opener: { revealItemInDir: async () => {}, openUrl: async () => {} },
   app: { getVersion: async () => window.__VERSION__ || "0.6.0" },
   webview: { getCurrentWebview: () => ({ onDragDropEvent: async () => {} }) },
+  event: { listen: async () => () => {} },
 };
 setTimeout(async () => {
   const names = Object.keys(analyses);
