@@ -1019,8 +1019,7 @@ async function openCompare(f, page) {
   const scroller = el("div", "cmp-stage");
   const captions = el("div", "cmp-captions");
   const note = el("p", "hint");
-  body.replaceChildren(toolbar, scroller, captions, note);
-  // Moving between pages: "‹ Page 3 of 12 ›" at the end of the toolbar, and the arrow keys.
+  // Moving between pages: "‹ Page 3 of 12 ›" centred under the page, and the arrow keys.
   // "Only pages with issues" is the page list's own switch: the arrows then skip clean pages, and
   // the list behind follows.
   const pager = el("div", "cmp-pager");
@@ -1038,6 +1037,9 @@ async function openCompare(f, page) {
     draw();
   };
   pager.append(onlyIssues, el("span", "tool-sep"), prev, pageOf, next);
+  const pagerRow = el("div", "cmp-pager-row");
+  pagerRow.append(pager);
+  body.replaceChildren(toolbar, scroller, pagerRow, captions, note);
   // The next page in direction d (1 or -1) that the arrows may show, or 0 when there is none.
   const target = (d) => {
     const only = pressed("only-issues");
@@ -1095,7 +1097,6 @@ async function openCompare(f, page) {
         view.recentre = true;
       }),
       diffToggle,
-      pager,
     ));
     pageOf.textContent = t("compare.pageOf", { page: view.page, total });
 

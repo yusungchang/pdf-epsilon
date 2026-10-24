@@ -52,6 +52,9 @@
   shown does not change when it is switched, and the label still gives the real page number.
 - *Tested:* harness screenshots of the comparison toolbar in English and Korean.
 
+**The comparison's page control moved to the bottom centre,** directly under the page, at the owner's
+request; the toolbar above keeps only the view, zoom and differences controls.
+
 ## 0.11.0, 25 October 2026
 
 Released at the owner's request so the comparison fix can be downloaded; built and tested locally as

@@ -431,8 +431,9 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 .cmp-step:focus-visible, .cmp-close:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 #compare:focus { outline: none; }
 .cmp-step:disabled { opacity: .3; cursor: default; }
-/* "‹ Page 3 of 12 ›" at the end of the toolbar, framed like the other controls. */
-.cmp-pager { margin-left: auto; display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 8px; padding: 2px; }
+/* "‹ Page 3 of 12 ›" centred under the page, framed like the other controls. */
+.cmp-pager-row { display: flex; justify-content: center; }
+.cmp-pager { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 8px; padding: 2px; }
 .cmp-pager .cmp-step { color: var(--ink); font-size: 18px; padding: 1px 10px; border-radius: 6px; }
 .cmp-pager .cmp-step:hover:not(:disabled) { background: var(--soft); border-color: transparent; }
 .cmp-page-of { font-size: 13px; font-variant-numeric: tabular-nums; padding: 0 6px; min-width: 7em; text-align: center; }
