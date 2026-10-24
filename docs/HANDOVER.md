@@ -30,7 +30,7 @@ The code is public at https://github.com/yusungchang/pdf-epsilon, branch `main`.
 | Font optimizer (`fonts.rs`, `subset.rs`) | Done for TrueType CID fonts. Checked by text and pixel comparison in MuPDF and macOS. |
 | Hostile-input hardening (`limits.rs`) | Done. Bounded decoding everywhere; 20 hostile-file tests on all platforms. See `SECURITY.md`. |
 | Thumbnails, page comparison, progress | Done in 0.4.0. Pages render in an isolated, memory-capped process; saving writes the compared copy. Checked in headless Chrome with a mocked bridge serving real renders; not yet clicked through in the real app window. |
-| Languages (`ui/locales`) | English and Korean. Every string is in the locale files; tests check they match. |
+| Languages (`ui/locales`) | English and Korean. Every string is in the locale files; tests check they match. The owner audited every string in context in 0.6.1 (see HISTORY). |
 | CI and releases (`.github/workflows/build.yml`) | Builds installers for all three platforms on every push to `main` and on `v*` tags. Tags also attach fixed-name copies for the website and verify the Mac signature. v0.4.0 is published (fixed-name copies added by hand); v0.5.0 is the first tag built with the new steps. |
 | Platforms | v0.4.0 tested by the owner on macOS (Intel and Apple silicon), Windows 11 and Linux Mint (`.deb`, VM): all ran. |
 | Website (`site/`, `pages.yml`) | Live at https://yusungchang.github.io/pdf-epsilon/ since 21 October 2026, English and Korean. Every download shows the first-launch steps. Bug reports come in as GitHub issues. |

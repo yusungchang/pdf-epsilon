@@ -130,7 +130,6 @@ header { padding: 20px 24px 8px; display: flex; justify-content: space-between; 
 .update-version { font-size: 12px; color: var(--muted); }
 .update-status { font-size: 14px; font-weight: 550; }
 .update-status.new { color: var(--accent); }
-.update-note { font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 8px; }
 .update-menu .primary { align-self: flex-start; }
 .update-menu .link { align-self: flex-start; padding: 0; }
 .language-button, .theme-button {
@@ -322,7 +321,6 @@ small { color: var(--muted); }
 .pill { font-size: 12px; font-weight: 600; border-radius: 999px; padding: 1px 9px; white-space: nowrap; background: var(--soft); }
 .pill.good { color: var(--good); }
 .pill.warn { color: var(--warn); }
-.pill.bad { color: var(--bad); }
 .pill.muted { color: var(--muted); }
 .f-detail { margin: 4px 0 0; color: var(--muted); font-size: 13px; -webkit-user-select: text; user-select: text; }
 .f-pages { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 6px; font-size: 12px; color: var(--muted); }

@@ -10,8 +10,40 @@
 | 0.3.1 | 2026-10-19 | Security hardening against hostile PDFs: bounded decoding everywhere, file size cap, hostile-file tests on all platforms. |
 | 0.4.0 | 2026-10-21 | Analysis progress, page thumbnails and before-and-after page comparison in an isolated renderer, removing files from the list, compact language button, theme button, icon tools for the page list. |
 | 0.6.0 | 2026-10-21 | Update check; damaged files are never half-copied; fuzzing and a public hostile corpus; security and privacy on the website. |
+| 0.6.1 | 2026-10-24 | Text audit of every screen in English and Korean; wording changes from the owner's review. |
 | 0.5.0 | 2026-10-21 | 0.4.1 released as a minor version at the owner's request; first-launch steps shown on every download; security review. |
 | 0.4.1 | 2026-10-21 | Long file names truncate on every WebKit, a round handle on the comparison divider, glass-finish icon, a product page on GitHub Pages, findings and pages folded under Advanced. |
+
+## 0.6.1, 24 October 2026
+
+The owner audited every interface string. To give context, the real interface was run in headless Chrome
+with a mocked engine and made-up files built to reach every message, and each string was labelled with its
+key where it appears: 39 screens in both languages, covering 271 of the 273 keys and every English plural
+form. The harness lived in the session scratchpad and is not in the repository.
+
+Changes from the owner's review:
+
+1. **Drop area.** "Drop PDFs here to get started" / "시작하려면 PDF를 여기에 끌어다 놓으세요".
+2. **Update menu.** The privacy line under the version check is gone (`update.privacy` removed).
+3. **Preset names in Korean sentences are quoted:** ‘균형’, ‘최소’ and `{preset}` / `{settings}` inside
+   sentences, because Korean has no capital letters to mark a name. Names standing alone (preset cards,
+   swipe tags, "균형: 34 MB 절감" style labels) stay plain.
+4. **Fully embedded fonts in Korean:** "통째로 내장된" became "전체가 내장된" / "글꼴 전체에서".
+5. **Font tables:** "Remove font data PDF viewers never use" / "PDF 뷰어가 쓰지 않는 글꼴 데이터 지우기", and
+   the matching finding title. The owner suggested "unused font data"; "PDF viewers" was kept because
+   the option next to it (keeping only the glyphs used) also removes unused data, and the two must not
+   read alike.
+6. **Save location:** "same folder as the original" instead of "next to the original".
+7. **Heavy pages in Korean:** "그림 명령이 매우 많은 페이지".
+8. **Comparison steps named for what they do.** The first step compresses the file with the current settings
+   (and that result is what saving writes), so it says "Compressing with these settings…" / "이 설정으로
+   압축하는 중…" instead of "Making the smaller copy"; `error.notPrepared` follows. The owner suggested
+   "preview", then "rendering"; rendering is the next step, so "Rendering the page…" / "페이지를 렌더링하는
+   중…" went there, with `compare.renderFailed` to match. The saved file is still "smaller copy" / "작은 사본".
+
+9. **Two strings deleted,** found by the audit: `files.analysing` was never used (the app shows
+   `files.analysingPercent`), and `pill.warning` could not appear, because warning findings are shown as
+   banners and filtered out of the list where pills are drawn. Its code branch and `.pill.bad` style went too.
 
 ## 0.6.0, 21 October 2026
 

@@ -506,8 +506,8 @@ function statusPill(x) {
     return ["good", t("pill.repack")];
   }
   if (x.status === "notYet") return ["warn", t("pill.notYet")];
-  if (x.status === "kept") return ["muted", t("pill.kept")];
-  return ["bad", t("pill.warning")];
+  // "kept". Warnings never reach here: they are shown as banners above the report.
+  return ["muted", t("pill.kept")];
 }
 
 function renderFindings(a) {
@@ -1241,8 +1241,7 @@ function renderUpdate() {
   };
   const show = (...lines) => menu.replaceChildren(
     el("p", "update-version", t("update.current", { version: mine ? mine.join(".") : "?" })),
-    ...lines,
-    el("p", "update-note", t("update.privacy")));
+    ...lines);
   const siteButton = (primary) => {
     const b = el("button", primary ? "primary" : "link", t("update.download"));
     b.type = "button";
