@@ -6,6 +6,10 @@ engine blockers were reproduced twice. Test files and harnesses were kept outsid
 
 Severity: **blocker** loses content or breaks the app; **should** fix before 1.0; **later** after 1.0.
 
+**Where it stands (25 October 2026, code at 1.0.0, not yet tagged).** Every blocker and every must item is
+done except three that wait on the owner: signed installers (`SIGNING.md`), registering pdfepsilon.com, and
+trying the release candidate on Windows and Linux. The tag `v1.0.0` follows those.
+
 ## Blockers
 
 All three fixed in 0.6.2; see `HISTORY.md` for how each was tested.
@@ -32,10 +36,13 @@ All three fixed in 0.6.2; see `HISTORY.md` for how each was tested.
 5. **Fixed in 0.7.0.** **Images shown larger in annotations, patterns or soft masks are downsampled to their small page size.**
    A stamp annotation turns to mush. `placement.rs:85-98`, `images.rs:104-110`.
 6. **Fixed in 0.7.0.** **`/UserUnit` is ignored**, so posters and CAD sheets are downsampled up to 10× too far. `placement.rs`.
-7. **PDF/A: the advice "Use Balanced or a lighter preset to keep it archival" is wrong for PDF/A-1.** Every
+7. **Message fixed in 1.0.0; output not changed.** **PDF/A: the advice "Use Balanced or a lighter preset to keep it archival" is wrong for PDF/A-1.** Every
    preset writes object streams and PDF 1.5, compresses the XMP stream, and leaves `/CIDSet` after
    subsetting. `lib.rs:485, 617`, `en.json` `finding.pdfa.detail`. Fix the output for PDF/A input, or change
    the message. Check with veraPDF.
+   1.0.0 confirmed it on a PDF/A-1b test file (even Lossless compresses the XMP and writes PDF 1.5 with
+   object streams) and changed the message: every preset breaks PDF/A, so keep the original where it
+   matters. Writing valid PDF/A output stays under "Later".
 8. **Fixed in 0.7.0.** **Analysis memory grows with file size:** four presets run in parallel on four copies. A 293 MB file peaked
    at 2.7 GB; near the 2 GB limit it would need about 18 GB. `analyze.rs:323`. Run presets one at a time above
    about 150 MB.
@@ -121,12 +128,13 @@ All three fixed in 0.6.2; see `HISTORY.md` for how each was tested.
 - **Done in 0.9.0: Save all.** Each file must be selected and saved one by one.
 - **Done in 0.9.0: Open With and file associations.** There is no Dock drop, no Finder or Explorer "Open with", and no
   single-instance handling on Windows and Linux.
-- **A licence.** `UNLICENSED`, while the repo is public and the website says "Free to use".
-- **The homepage points to pdfepsilon.com, which is unregistered.** Use the github.io address until it is
-  bought.
-- **A click-through of the real app on all three platforms.** The interface has only been checked in
-  headless Chrome.
-- **Signing,** or a deliberate decision to ship unsigned. macOS is ad-hoc signed and not notarised; Windows has
+- **Done in 1.0.0: MIT licence** (`LICENSE`). Was: `UNLICENSED`, while the repo is public and the website says "Free to use".
+- **The homepage points to pdfepsilon.com, which is unregistered.** Owner's decision (25 October 2026): keep
+  it; the owner registers the domain before the release.
+- **A click-through of the real app on all three platforms.** The owner has used the real app on macOS
+  through 0.11. Owner's decision: a release candidate from `main` is tried on Windows and Linux before the tag.
+- **Signing.** Owner's decision (25 October 2026): 1.0.0 waits for signed installers. What to buy and
+  what then changes is in `SIGNING.md`. macOS is ad-hoc signed and not notarised; Windows has
   no certificate, so SmartScreen warns.
 
 **Should:**
@@ -159,24 +167,27 @@ All three fixed in 0.6.2; see `HISTORY.md` for how each was tested.
 
 ## Website and README claims to correct
 
-- "Only the letters in use are kept": true only for TrueType CID fonts.
-- "The size you see is the size you get": true for the four presets, not for custom settings.
-- "Charts and screenshots stay lossless": decided by a colour-count sample, so detailed charts can become JPEG.
+- Fixed in 1.0.0 (site and README): "Only the letters in use are kept": true only for TrueType CID fonts.
+- Kept: "The size you see is the size you get": the site says it of the presets ("Each preset runs on your
+  file first"), which is true.
+- Fixed in 1.0.0 (site and README): "Charts and screenshots stay lossless": decided by a colour-count sample, so detailed charts can become JPEG.
   CMYK photos are not touched.
-- "Not a word changes": checked by hand on the test files. The app checks page count only, and blocker 2 removes
+- Kept in 1.0.0: since 0.7.0 every copy is checked for every glyph the pages draw, and the qpdf corpus
+  and real files are compared by extracted text. Was: "Not a word changes": checked by hand on the test files. The app checks page count only, and blocker 2 removes
   glyphs without changing the text.
-- PDF/A advice in the app (item 7).
+- Fixed in 1.0.0: PDF/A advice in the app (item 7).
 - Done in 0.9.0: The README's "Not yet supported" list is incomplete: it is missing Save all, Open With, the size and object
   limits, damaged files, inline images, and that only `.pdf` names are accepted.
-- `SECURITY.md`: the renderer memory figures (item 11).
+- Done in 0.8.0: `SECURITY.md`: the renderer memory figures (item 11).
 
 ## Packaging
 
-- Version to 1.0.0 in all three files.
+- Done: version 1.0.0 in all three files.
 - `LSMinimumSystemVersion 10.13` has never been tested.
-- No `ko` in `CFBundleLocalizations`, so system menus stay in English for Korean users.
+- Done in 1.0.0: `src-tauri/Info.plist` declares `en` and `ko` in `CFBundleLocalizations`, so system
+  dialogs follow a Korean system. Was: no `ko`, so system menus stayed in English for Korean users.
 - The NSIS installer is English only.
 - MSI and NSIS installers are both shipped.
 - The CI toolchain and `tauri-action` are not pinned, and releases publish no checksums.
-- `HANDOVER.md` "Last updated" says 0.4.0, and "Progress is per file only" is out of date.
+- Done: `HANDOVER.md` brought up to date for 1.0.0.
 - The minor-release routine still applies: security review, hostile corpus, fuzzing, then tag `v1.0.0`.

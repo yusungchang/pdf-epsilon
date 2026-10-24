@@ -281,7 +281,7 @@
   "finding.signed.title": "This document is digitally signed",
   "finding.signed.detail": "Any compression rewrites the file, which makes the signature invalid. Keep the original wherever the signature matters.",
   "finding.pdfa.title": "Archival PDF/A-{level}",
-  "finding.pdfa.detail": "[[Small]] removes XMP metadata, which PDF/A requires. Use [[Balanced]] or a lighter preset to keep it archival.",
+  "finding.pdfa.detail": "Every preset, even [[Lossless]], rewrites the file in ways PDF/A does not allow, such as compressing its XMP metadata, so the copy will no longer be a valid archival file. Keep the original wherever PDF/A matters.",
   "finding.hiddenLayers.title": "Hidden layers",
   "finding.hiddenLayers.detail": "Some layers are switched off by default. Their content is kept and counted, even though it is not visible.",
   "finding.presetFailed.title": "[[{preset}]] could not be applied",

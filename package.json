@@ -1,7 +1,8 @@
 {
   "name": "pdf-epsilon",
   "private": true,
-  "version": "0.11.1",
+  "license": "MIT",
+  "version": "1.0.0",
   "author": "yusungchang (https://www.linkedin.com/in/yusungchang/)",
   "description": "Make PDFs smaller. Keep what matters.",
   "scripts": {

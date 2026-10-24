@@ -1,7 +1,7 @@
 # Handover
 
 Where PDF Epsilon stands, what has been verified, and what to do next.
-Last updated 25 October 2026, at version 0.11.1.
+Last updated 25 October 2026, at version 1.0.0 (prepared, not yet tagged: it waits for signing).
 
 ## The brief
 
@@ -26,9 +26,9 @@ The code is public at https://github.com/yusungchang/pdf-epsilon, branch `main`.
 | Engine (`crates/epsilon`) | Done. Unit and integration tests pass. |
 | Analyzer (`analyze.rs`) | Done. Checked on the eight test files; categories add up to the exact size. |
 | Desktop shell (`src-tauri`) | Done. Release build verified on macOS, Apple silicon. |
-| Interface (`ui`) | Done. Checked in headless Chrome with a mocked bridge serving real analyses. Not yet clicked through in the real app window. |
+| Interface (`ui`) | Done. Checked in headless Chrome with a mocked bridge serving real analyses, and used by the owner in the real app on macOS through 0.11. Windows and Linux were last tried by hand at 0.4.0. |
 | Font optimizer (`fonts.rs`, `subset.rs`) | Done for TrueType CID fonts. Checked by text and pixel comparison in MuPDF and macOS. |
-| Hostile-input hardening (`limits.rs`) | Done. Bounded decoding everywhere; 20 hostile-file tests on all platforms. See `SECURITY.md`. |
+| Hostile-input hardening (`limits.rs`) | Done. Bounded decoding everywhere; the hostile-file tests run on all platforms, and the hostile corpus, qpdf corpus and fuzzing are rerun for every minor release. See `SECURITY.md`. |
 | Thumbnails, page comparison, progress | Done in 0.4.0. Pages render in an isolated, memory-capped process; saving writes the compared copy. Checked in headless Chrome with a mocked bridge serving real renders; not yet clicked through in the real app window. |
 | Languages (`ui/locales`) | English and Korean. Every string is in the locale files; tests check they match. The owner audited every string in context in 0.6.1 (see HISTORY). |
 | CI and releases (`.github/workflows/build.yml`) | Builds installers for all three platforms on every push to `main` and on `v*` tags. Tags also attach fixed-name copies for the website and verify the Mac signature. v0.4.0 is published (fixed-name copies added by hand); v0.5.0 is the first tag built with the new steps. |
@@ -125,7 +125,6 @@ truncated PDF both give a clear "not a readable PDF" message.
   An app that says "damaged" has a broken signature; check with `codesign --verify --deep --strict`.
   Windows SmartScreen also warns. Removing the warnings needs an Apple Developer ID with notarization and a
   Windows code-signing certificate.
-- **No license file.** The manifests say `UNLICENSED` until the owner chooses one.
 - **The domain is unregistered.** pdfepsilon.com showed no whois match on 19 October 2026, but it has not been bought.
 
 ## Release routine
@@ -136,15 +135,16 @@ so `v0.4.0` is the first release to include it.
 
 ## Next steps
 
-0. **Release 1.0.0.** The owner wants to release 1.0.0 once the wrinkles are gone. `RELEASE-1.0.md` is the
-   working list: the review of 24 October 2026, with the blockers (fixed in 0.6.2), the should-fix items
-   for engine, shell and interface, and the unsupported features sorted into must, should and later.
-   Work through it in order and mark items fixed there as they land.
+0. **Release 1.0.0.** The code is ready and versioned 1.0.0 (MIT licence, release checks run; see HISTORY).
+   It waits on three owner steps, then gets the minor-release tag `v1.0.0`:
+   - buy and set up signing, then wire it into CI as `SIGNING.md` describes;
+   - register pdfepsilon.com (the homepage in the manifests and README);
+   - try a release candidate from `main` (CI artifacts) on Windows and Linux.
+   `RELEASE-1.0.md` keeps the full list, including the should and later items left for 1.x.
 1. **Owner decisions pending.** Email contact with users (optional, never required) was raised for 0.6.0 and
    left for later. Donations (GitHub Sponsors, Ko-fi, toss.me) were discussed and not built yet.
    Report the lopdf free-entry bug upstream (see HISTORY 0.6.0, item 3) once the owner agrees.
-2. **Owner decisions.** Choose a license, register the domain, and decide on code signing. Signing needs an Apple Developer
-   account for macOS and a certificate for Windows.
+2. **Owner decisions.** Licence chosen (MIT, 1.0.0). The domain and signing are part of step 0.
 3. **Engine improvements,** in the order recommended by `reports/PDF size optimization techniques.md` (19 October 2026):
    CCITT G4 then lossless JBIG2 for bilevel images; lossless pixel-format reduction with PNG predictors; lossless JPEG
    Huffman optimisation (also a safe path for CMYK JPEGs); `libdeflater` plus structural tidying; simple-font and CFF

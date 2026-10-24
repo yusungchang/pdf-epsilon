@@ -19,8 +19,62 @@
 | 0.10.0 | 2026-10-24 | Faster: images on every core, a SIMD resizer, shared work in analyses, a lookup table in the operation count; memory sized to the computer. Analysis 1.8×, saving 2.0× against 0.9.0. |
 | 0.11.0 | 2026-10-25 | Released as a minor version at the owner's request (built locally as 0.10.1). Comparison pictures no longer lost when they arrive after the reply (the cause of "could not be rendered", worst at 2× and 4×). "Details" starts closed; no focus ring on the comparison's close button when it opens. |
 | 0.11.1 | 2026-10-25 | One "Compare pages" button above the page list instead of one per page; page arrows in the comparison moved into the toolbar as "‹ Page 3 of 12 ›", with the arrow keys; zoom icons; "Only pages with issues" in the comparison. |
+| 1.0.0 | 2026-10-25 | Prepared, not yet tagged (waits for signing): MIT licence, corrected PDF/A advice, Korean system dialogs on macOS, site and README claims corrected; full release checks. |
 | 0.5.0 | 2026-10-21 | 0.4.1 released as a minor version at the owner's request; first-launch steps shown on every download; security review. |
 | 0.4.1 | 2026-10-21 | Long file names truncate on every WebKit, a round handle on the comparison divider, glass-finish icon, a product page on GitHub Pages, findings and pages folded under Advanced. |
+
+## 1.0.0, 25 October 2026 (prepared; tag waits for signing)
+
+The owner asked for 1.0.0 with "nothing funny". The code is versioned 1.0.0 and checked, but not
+tagged: the owner chose to wait for signed installers, to register pdfepsilon.com, and to try a
+release candidate (CI artifacts from `main`) on Windows and Linux first. See `RELEASE-1.0.md` and
+`SIGNING.md`.
+
+**Owner's decisions.** MIT licence. Keep pdfepsilon.com as the homepage and register it. Ship signed,
+so 1.0.0 waits for certificates. A release candidate first.
+
+**Changes.**
+- *Licence:* `LICENSE` (MIT, Copyright 2026 Yusung Chang); `license = "MIT"` in `Cargo.toml` and
+  `package.json`, which said `UNLICENSED`; a Licence section in the README.
+- *PDF/A advice (review item 7):* the finding said "Use Balanced or a lighter preset to keep it
+  archival". A PDF/A-1b test file showed that every preset, even Lossless, compresses the XMP metadata
+  stream (PDF/A forbids a filter on it) and writes PDF 1.5 with object streams (PDF/A-1 is PDF 1.4).
+  The message now says every preset breaks PDF/A and to keep the original where it matters. Writing
+  valid PDF/A stays under "Later".
+  Not checked with veraPDF, which is not installed here; the rules were taken from the PDF/A standard.
+- *Korean system dialogs on macOS:* `src-tauri/Info.plist` declares `en` and `ko` in
+  `CFBundleLocalizations` (merged into the app's Info.plist; checked in the built app), so the file
+  and folder dialogs follow a Korean system.
+- *Claims corrected on the website and in the README:* fonts are trimmed only when they are fully
+  embedded TrueType (CID) fonts; images with few colours, "like most charts and screenshots", stay
+  lossless, since it is decided from a colour sample. English and Korean.
+- *Docs:* `SIGNING.md` (what to buy, which secrets, what changes in CI); `RELEASE-1.0.md` marked up
+  with where each item stands; `HANDOVER.md` brought up to date.
+
+**Release checks (the minor-release routine).** Since 0.10.0 the engine's code is unchanged (one test
+helper lost a needless `mut`), and the only new parsing-adjacent change is the PDF/A message, so there
+was no new path to review against `SECURITY.md` and no new hostile case. Everything was still rerun:
+- *Tests:* `cargo test --workspace --release`, all pass; `tests/locales.rs` after the text changes.
+- *Hostile corpus (23 files, 2 GB bombs):* every outcome as in 0.9.0. Hostile files peak at 533 MB
+  (the font bomb, analysis); the 500,000-object file analyses in 28.8 s and 3.9 GB (0.9.0: 30.8 s,
+  4.3 GB) and saves in 7.0 s and 2.3 GB.
+- *qpdf corpus (708 files):* no crash, hang or panic; analysis at most 0.42 s and 545 MB; 502 copies
+  written with Balanced, 500 with exactly the original's text in MuPDF. The other two (`bad40`,
+  `object-stream-self-ref`) are the same two as in every release since 0.6: MuPDF cannot read the
+  originals, and the copies show more text, not less. The renderer: at most 0.29 s and 38 MB.
+- *Fuzzing:* 50,000 inputs from the 1,250 qpdf seeds: no panic, hang or crash; at most 780 MB (0.10.0's
+  run: 357 MB). The engine is the same code, so the difference is this run's random inputs; it stays
+  far under the fuzzer's 3 GB cap and the app's limits.
+- *Real test files, against 0.6.0 (the standing regression):* all 32 outputs (8 files × 4 presets) are
+  written, with the same page count and exactly the original's text in MuPDF; 29 are smaller and 3 keep
+  the original, as before. All 8 analyses account for the same bytes per category. Slowest save 1.2 s,
+  largest 206 MB; slowest analysis 1.5 s, largest 394 MB. All 8 renders identical to 0.6.0. Over the
+  qpdf corpus, only two outcomes differ from 0.6.0, both known fixes (`minimal-linearize-pass1`,
+  `append-page-content-damaged` now save instead of being refused), and the 0.6.0 run of
+  `18-forms-fanned-out` still times out where 1.0.0 takes 1.7 s.
+- *Mac signature:* the built app verifies with `codesign --verify --deep --strict` once copied without
+  iCloud Drive's extended attributes (they are added because the project lives in iCloud; CI checks
+  on a clean machine).
 
 ## 0.11.1, 25 October 2026
 

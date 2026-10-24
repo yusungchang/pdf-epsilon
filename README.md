@@ -59,9 +59,11 @@ Source: <https://github.com/yusungchang/pdf-epsilon>.
 
 1. **Downsamples oversized images.** Each image's resolution is measured from the
    size it is actually drawn on the page, not guessed from the page size.
-2. **Re-encodes photographs as JPEG** at the chosen quality. Flat graphics such as
-   screenshots, charts and transparency masks stay lossless.
-3. **Slims embedded fonts.** Fonts embedded in full keep only the glyphs the pages draw,
+2. **Re-encodes photographs as JPEG** at the chosen quality. Images with few colours, such as
+   most screenshots and charts, stay lossless, decided from a sample of their colours; transparency
+   masks always do.
+3. **Slims embedded fonts.** TrueType fonts embedded in full (CID fonts, the usual kind for CJK
+   text) keep only the glyphs the pages draw,
    and every font loses data no PDF viewer reads, such as screen bitmaps. Text looks the
    same and stays searchable. A 15 MB test file with a whole CJK font became 80 KB.
 4. **Merges identical streams.** A logo repeated on every page is stored once.
@@ -162,3 +164,7 @@ newest published release.
 run `python3 -m http.server --directory site` and open http://localhost:8000/ (add `?lang=ko` for Korean).
 The screenshots in `site/shots/` are made with `tools/ui-preview/preview.sh` at `PREVIEW_SCALE=2` and
 `PREVIEW_CLEAN=1`, from a demo PDF.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
