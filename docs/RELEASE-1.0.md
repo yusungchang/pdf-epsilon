@@ -1,0 +1,178 @@
+# Before 1.0.0
+
+Review of 24 October 2026 (at 0.6.1): interface, desktop shell, engine, and what is not supported.
+Four reviews ran in parallel; each finding was traced in the code, and most were reproduced. The two
+engine blockers were reproduced twice. Test files and harnesses were kept outside the repository.
+
+Severity: **blocker** loses content or breaks the app; **should** fix before 1.0; **later** after 1.0.
+
+## Blockers
+
+1. **Images whose `/DecodeParms` is an array or a reference come out as noise.** lopdf reads only a direct
+   dictionary, so the PNG predictor is skipped, the row bytes shift, and the scrambled pixels are re-encoded
+   as JPEG. Common in files that went through Ghostscript or iText (`/DecodeParms [<< /Predictor 15 >>]`).
+   `images.rs:194-198`, `raw_image` `images.rs:350-363`; the same applies to `/CIDToGIDMap` (`subset.rs:195`).
+   Fix: resolve the reference and a one-element array, otherwise leave the image; require the decoded length
+   to match width × height × components.
+2. **Font subsetting drops glyphs when a font is selected inside `q … Q`.** The current font is not restored at
+   `Q`, so text drawn after it is attributed to the wrong font and its glyphs are removed. Happens even with
+   Lossless. `mutool draw -F txt` does not notice, because the text is still there; only the glyph is gone.
+   `subset.rs:351-411`. Fix: keep a graphics-state stack for the font.
+3. **Closing the comparison while it is compressing locks the page.** `onclose` uses `resizeWatch` before it
+   is declared, throws, and the page behind stays unscrollable. ‹ and › also throw while preparing.
+   `ui/app.js:794-797`, `:1017`, `:787`.
+
+## Should fix: engine
+
+4. **Forms or patterns drawn many times make analysis exponential.** A 2.2 KB file with 8 levels took 23 s to
+   save and 43 s to analyse; 10 levels would take hours. `placement.rs:185-215`. Remember results per form or
+   set an operation budget; add to `tests/hostile.rs`.
+5. **Images shown larger in annotations, patterns or soft masks are downsampled to their small page size.**
+   A stamp annotation turns to mush. `placement.rs:85-98`, `images.rs:104-110`.
+6. **`/UserUnit` is ignored**, so posters and CAD sheets are downsampled up to 10× too far. `placement.rs`.
+7. **PDF/A: the advice "Use Balanced or a lighter preset to keep it archival" is wrong for PDF/A-1.** Every
+   preset writes object streams and PDF 1.5, compresses the XMP stream, and leaves `/CIDSet` after
+   subsetting. `lib.rs:485, 617`, `en.json` `finding.pdfa.detail`. Fix the output for PDF/A input, or change
+   the message. Check with veraPDF.
+8. **Analysis memory grows with file size:** four presets run in parallel on four copies. A 293 MB file peaked
+   at 2.7 GB; near the 2 GB limit it would need about 18 GB. `analyze.rs:323`. Run presets one at a time above
+   about 150 MB.
+9. **Verification is page count only.** None of the issues above were caught. Cheap additions: an exact
+   decoded-length check for images; per-page counts of annotations, fields, outline items and resources before
+   and after; after subsetting, re-walk the output and check every used glyph is present; optionally a
+   low-resolution render comparison of pages whose fonts or images changed (the renderer already exists).
+10. Smaller engine points:
+    - DCT images with `/ColorTransform 0` get wrong colours (`images.rs:181`).
+    - Fonts used only by streams that aren't forms (JavaScript templates, appearances without `/Subtype`) can
+      be subset away (`subset.rs:282-291`).
+    - Barcodes and QR codes can be downsampled until they stop scanning.
+    - A crash inside a preset is reported as "failed verification" (`analyze.rs:352`).
+    - A u16 overflow in `fonts::write` is possible on hostile fonts (`fonts.rs:139-147`).
+    - Free entries in xref-stream updates are not read by `revisions.rs`.
+
+## Should fix: desktop shell
+
+11. **The renderer's 1 GB memory cap does not cap memory.** It counts live heap, but a 5.6 MB file with large
+    images reached 5.3 GB resident. `SECURITY.md` claims otherwise. `main.rs:21-85`. Watch the child's resident
+    memory from the parent and kill it above the limit; on Linux, add `RLIMIT_AS`, and on Windows a Job Object
+    limit.
+12. **There is no limit on renderer processes at once, and none are cancelled.** Each compared page starts two,
+    and fast scrolling started 17 thumbnail renders. `main.rs:250-275`, `app.js:568-590`. Run one or two at a
+    time; drop requests no longer wanted.
+13. **The renderer hitting its cap aborts and writes a macOS crash report** (22 found in DiagnosticReports).
+    Exit quietly instead (`main.rs:43`).
+14. **Renderer children can outlive the app** until their page finishes (`render.rs:48-93`). Add a watchdog.
+15. **Changing the original after comparing saves the old content.** The prepared copy and the analysis are
+    keyed by path and settings only. `main.rs:171-200, 281`. Add size and modified time to the key.
+16. **The prepared cache holds up to three full copies** (up to 6 GB) (`main.rs:180`). Cap by bytes.
+17. **No thumbnails or comparison for files over about 0.5–1 GB;** the child fails to parse them
+    (`render.rs:50-65`). Say so instead of showing blanks.
+18. **Save errors are all "Could not read or write the file"**, with an English OS message even in Korean:
+    - a removed output folder (remembered, so every save then fails);
+    - a read-only volume;
+    - names too long (a long Korean name plus `-epsilon.pdf` on Linux).
+
+    Add codes for not found, permission and read-only, shorten long names, and check the remembered folder
+    at start.
+19. Smaller shell points:
+    - Outputs are not written atomically, so cloud sync can upload a half-written file.
+    - The download-quarantine marker is not carried over.
+    - The `file_size` command is unused.
+
+## Should fix: interface
+
+20. **The dpi field can't be typed into:** each keystroke is clamped and written back ("300" becomes 36, 360,
+    1200). `app.js:180`, `:162`. Clamp on blur.
+21. **Saving is global, not per file:** other files show "Saving…", a result is lost if its file is removed,
+    and changing language mid-save resets the label. `app.js:478-497`.
+22. **Failed renders are cached forever** (`app.js:765-770`, `:588`), and quickly switching files can leave
+    thumbnails blank for good (one shared timer, `:566-573`).
+23. **Custom settings show "unchanged" for every image** in the page tables (`:711-728`).
+24. **When every preset fails, the chip says "already lean"**, Save stays enabled, and the card tooltip is English
+    engine text (`:303`, `:423`).
+25. **Compare:**
+    - a landscape page after a portrait one is drawn blurry (`:881`);
+    - the side-by-side hint says "drag" (`:871`);
+    - the hint mentions saving, but there is no Save button in the window.
+26. **Keyboard focus jumps to the top** after choosing a preset, file chip, page row or compare button.
+27. **No cancel, and no progress on Save.** Removing a file mid-analysis hides it, but the queue waits for it.
+28. **Dropping a folder or a non-PDF does nothing and says nothing** (`:203`).
+29. **Re-adding a file doesn't re-analyse it**, so a file that failed can't be retried without removing it first.
+30. **Large documents get slow:** a 5000-page file takes about 175 ms per quality-slider tick, and Expand all then
+    jump takes 2.4 s. Render caches grow without a limit.
+31. Smaller interface points:
+    - A waiting file shows "Analysing… 0%".
+    - The unreadable-pages banner stops at 10 with no "and N more".
+    - "Show in Finder" fails silently if the file has moved.
+    - A rate-limited update check says "Couldn't reach GitHub".
+    - Menus have no arrow keys or focus return.
+    - Text can't be selected for copying error messages.
+    - The light theme flashes before dark applies.
+    - "Show 4 more of 4 remaining" reads oddly.
+    - The compare difference check freezes the window on big pages.
+
+## Not supported (decide: build, or say so)
+
+**Must for 1.0** (common, or the product looks broken without it):
+- **Save all.** Each file must be selected and saved one by one.
+- **Open With and file associations.** There is no Dock drop, no Finder or Explorer "Open with", and no
+  single-instance handling on Windows and Linux.
+- **A licence.** `UNLICENSED`, while the repo is public and the website says "Free to use".
+- **The homepage points to pdfepsilon.com, which is unregistered.** Use the github.io address until it is
+  bought.
+- **A click-through of the real app on all three platforms.** The interface has only been checked in
+  headless Chrome.
+- **Signing,** or a deliberate decision to ship unsigned. macOS is ad-hoc signed and not notarised; Windows has
+  no certificate, so SmartScreen warns.
+
+**Should:**
+- Owner-password-only PDFs (opening needs no password; common for statements and e-books) are refused like
+  fully encrypted ones.
+- Cancel for analysis, comparison and saving.
+- Scans: 1-bit images, with no CCITT G4 or JBIG2 output (the top item in the size report).
+- CMYK, indexed, spot-colour and Lab images are untouched. Lossless JPEG Huffman optimisation is the safe
+  route.
+- PNG predictors for lossless images.
+- Optional removal of accessibility tags.
+- Font subsetting covers only TrueType CID fonts (Identity). Simple TrueType, Type 1 and CFF are not covered.
+- An accessibility pass: VoiceOver, NVDA and keyboard.
+
+**Later** (disclose in the README):
+- JPEG 2000, JBIG2 and CCITT inputs, chained filters, stencil and colour-key masks, `/Decode` arrays, images
+  over 100 MP, 16-bit and odd bit depths, inline images.
+- Cropping off-page images.
+- Merging repeated typefaces.
+- Removing JavaScript, attachments, annotations, bookmarks or hidden layers.
+- Grayscale, target size ("under 10 MB"), mozjpeg.
+- Linearisation; PDF/A output.
+- A command-line tool.
+- Parallel analysis.
+- In-app update installation.
+- Languages beyond English and Korean.
+- ARM64 builds for Windows and Linux.
+- Homebrew, winget and Flatpak.
+- Files over 2 GB or 1 million objects, and damaged files, are refused by design.
+
+## Website and README claims to correct
+
+- "Only the letters in use are kept": true only for TrueType CID fonts.
+- "The size you see is the size you get": true for the four presets, not for custom settings.
+- "Charts and screenshots stay lossless": decided by a colour-count sample, so detailed charts can become JPEG.
+  CMYK photos are not touched.
+- "Not a word changes": checked by hand on the test files. The app checks page count only, and blocker 2 removes
+  glyphs without changing the text.
+- PDF/A advice in the app (item 7).
+- The README's "Not yet supported" list is incomplete: it is missing Save all, Open With, the size and object
+  limits, damaged files, inline images, and that only `.pdf` names are accepted.
+- `SECURITY.md`: the renderer memory figures (item 11).
+
+## Packaging
+
+- Version to 1.0.0 in all three files.
+- `LSMinimumSystemVersion 10.13` has never been tested.
+- No `ko` in `CFBundleLocalizations`, so system menus stay in English for Korean users.
+- The NSIS installer is English only.
+- MSI and NSIS installers are both shipped.
+- The CI toolchain and `tauri-action` are not pinned, and releases publish no checksums.
+- `HANDOVER.md` "Last updated" says 0.4.0, and "Progress is per file only" is out of date.
+- The minor-release routine still applies: security review, hostile corpus, fuzzing, then tag `v1.0.0`.
