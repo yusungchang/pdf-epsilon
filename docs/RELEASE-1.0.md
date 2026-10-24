@@ -26,23 +26,25 @@ All three fixed in 0.6.2; see `HISTORY.md` for how each was tested.
 
 ## Should fix: engine
 
-4. **Forms or patterns drawn many times make analysis exponential.** A 2.2 KB file with 8 levels took 23 s to
+4. **Fixed in 0.7.0.** **Forms or patterns drawn many times make analysis exponential.** A 2.2 KB file with 8 levels took 23 s to
    save and 43 s to analyse; 10 levels would take hours. `placement.rs:185-215`. Remember results per form or
    set an operation budget; add to `tests/hostile.rs`.
-5. **Images shown larger in annotations, patterns or soft masks are downsampled to their small page size.**
+5. **Fixed in 0.7.0.** **Images shown larger in annotations, patterns or soft masks are downsampled to their small page size.**
    A stamp annotation turns to mush. `placement.rs:85-98`, `images.rs:104-110`.
-6. **`/UserUnit` is ignored**, so posters and CAD sheets are downsampled up to 10× too far. `placement.rs`.
+6. **Fixed in 0.7.0.** **`/UserUnit` is ignored**, so posters and CAD sheets are downsampled up to 10× too far. `placement.rs`.
 7. **PDF/A: the advice "Use Balanced or a lighter preset to keep it archival" is wrong for PDF/A-1.** Every
    preset writes object streams and PDF 1.5, compresses the XMP stream, and leaves `/CIDSet` after
    subsetting. `lib.rs:485, 617`, `en.json` `finding.pdfa.detail`. Fix the output for PDF/A input, or change
    the message. Check with veraPDF.
-8. **Analysis memory grows with file size:** four presets run in parallel on four copies. A 293 MB file peaked
+8. **Fixed in 0.7.0.** **Analysis memory grows with file size:** four presets run in parallel on four copies. A 293 MB file peaked
    at 2.7 GB; near the 2 GB limit it would need about 18 GB. `analyze.rs:323`. Run presets one at a time above
    about 150 MB.
-9. **Verification is page count only.** None of the issues above were caught. Cheap additions: an exact
+9. **Fixed in 0.7.0.** **Verification is page count only.** None of the issues above were caught. Cheap additions: an exact
    decoded-length check for images; per-page counts of annotations, fields, outline items and resources before
    and after; after subsetting, re-walk the output and check every used glyph is present; optionally a
    low-resolution render comparison of pages whose fonts or images changed (the renderer already exists).
+   0.7.0 added all but the render comparison, which is still open; images are instead decoded again and
+   compared with the pixels meant.
 10. Smaller engine points:
     - Fixed in 0.6.2: DCT images with `/ColorTransform 0` got wrong colours; JPEGs with decode parameters are now left alone.
     - Fonts used only by streams that aren't forms (JavaScript templates, appearances without `/Subtype`) can

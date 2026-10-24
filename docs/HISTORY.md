@@ -12,8 +12,85 @@
 | 0.6.0 | 2026-10-21 | Update check; damaged files are never half-copied; fuzzing and a public hostile corpus; security and privacy on the website. |
 | 0.6.1 | 2026-10-24 | Text audit of every screen in English and Korean; wording changes from the owner's review. |
 | 0.6.2 | 2026-10-24 | Three blockers from the 1.0 review fixed: scrambled predicted images, glyphs lost after `Q`, comparison window locking the page. |
+| 0.7.0 | 2026-10-24 | Every copy is checked (structure, letters, images); images sized where they are really drawn; `/UserUnit`; bounded form walks; less memory on big files; stale `/Prev` fixed. |
 | 0.5.0 | 2026-10-21 | 0.4.1 released as a minor version at the owner's request; first-launch steps shown on every download; security review. |
 | 0.4.1 | 2026-10-21 | Long file names truncate on every WebKit, a round handle on the comparison divider, glass-finish icon, a product page on GitHub Pages, findings and pages folded under Advanced. |
+
+## 0.7.0, 24 October 2026
+
+Two of the three blockers in 0.6.2 lost content while every existing check passed: the only check on a
+copy was that it reloads with the same page count. The owner agreed to make checking every copy the next
+change, together with the remaining engine items that change content (`RELEASE-1.0.md`, items 4 to 9).
+
+1. **Checks on every copy (`verify.rs`, new).** Written apart from the code they check, so a mistake there
+   is not repeated.
+   - *Structure.* Before anything changes, the engine counts, per page, the annotations and the resource
+     entries that point at something (forms followed, each form counted once by id), and for the document
+     the bookmarks, form fields, attachments and named destinations. The saved copy is read back from its
+     bytes and counted the same way. Any difference refuses the copy with "failed verification", saying
+     what differs ("page 3: 4 annotations instead of 5").
+   - *Letters.* After font subsetting, the text is read again by a separate reader of the graphics state:
+     `q`/`Q`, `Tf`, fonts set by a graphics state, fonts inherited by forms, annotation appearances. Every
+     glyph drawn with a subset font must still have its outline, unless it had none before. If one is
+     missing, the subsetting is undone and the fonts stay whole (`Report.fonts_restored`). Subsetting
+     now keeps what it replaced for this (`subset::Undo`).
+   - *Images.* Each recompressed image is decoded again as a viewer would read it. A lossless one must
+     match exactly; a JPEG must average within 20 levels per channel of the pixels it was made from.
+     Otherwise that image is kept as it was.
+   - *Tested:*
+     - With the 0.6.2 `q`/`Q` fix taken out again, the regression file's subsetting was undone and both
+       fonts were kept whole (11 glyphs each), so the bug could no longer lose a letter.
+     - Unit tests: a glyph removed from the font that draws it, reached through a form after `q … Q`, is
+       found; counts and their comparison; images that do and do not read back.
+     - The eight real test files with Lossless, Balanced and Small: all 24 copies are byte-for-byte the
+       same as 0.6.2, with the same text. The letter check ran on six subset fonts in three files and
+       passed. Time is unchanged within noise.
+2. **Images measured where they are really drawn (`placement.rs`).**
+   - An image also shown in an annotation appearance, tiling pattern, soft mask or Type 3 glyph is no
+     longer downsampled below the largest page's size. The reviewer's file, a 600 × 400 photo drawn 60 pt
+     wide on the page and 600 pt wide in a stamp, had been cut to 125 × 83; it now stays 600 × 400.
+   - `/UserUnit` scales the drawn size, page boxes and the largest page. A poster with `/UserUnit 10` had
+     its image cut from 600 × 400 to 208 × 139; it now stays 600 × 400.
+   - Each page's walk has a budget of 2 million drawing operations, forms included
+     (`limits::PAGE_OPERATIONS`); past it the page counts as unreadable. The reviewer's 2.2 KB file with
+     forms fanned out 8 levels took 27.5 s to save; it now takes 3.4 s. A 10-level version (a new hostile
+     case) ran past 5 minutes in 0.6.2 and now takes 3.3 s to analyse.
+3. **Less memory on big files.** Files over 150 MB are analysed one preset at a time
+   (`limits::PARALLEL_BYTES`). A 286 MB test file peaked at 2.77 GB and took 4.2 s; now 1.6 GB and 6.3 s.
+4. **Copies no longer point at the original's earlier revisions.** lopdf keeps `/Prev` from the input's
+   trailer when it cannot follow it, and the copy then pointed into nothing and could not be read back.
+   `save` now removes `/Prev` and `/XRefStm`. Found by the qpdf corpus run below: two files were refused
+   for this in 0.6.2 and 0.7.0 alike, and are now written with identical text. On every other file the
+   change makes no difference to the bytes.
+5. **Tests added.**
+   - `tests/regressions.rs`: `/UserUnit`, an image in a stamp annotation, annotations kept, and the stale
+     `/Prev` case, which uses one small file from the qpdf test suite (`tests/data`, Apache License 2.0).
+   - `tests/hostile.rs` now has 25 cases: forms fanned out 10 levels; a bookmark that is its own next; a
+     form field that is its own kid; a name tree containing itself; an appearance that draws itself.
+6. **Minor release routine.**
+   - *Security review.* New parsing paths: the structure counts and letter reader (`verify.rs`), the
+     image-use walk (`placement.rs`) and the page budget. All decode through `limits.rs`, every walk tracks
+     what it has visited, and the new walks also stop at a million nodes and 16 levels. Each has a hostile
+     case.
+   - *Hand-run hostile corpus*, rebuilt (23 files: seven 2 GB bombs, absurd predictors, an operation
+     flood, cycles, deep nesting, 20,000 nested forms, a lying font, a 65,000-pixel JPEG header, the five
+     new cases, and a legitimate file of 500,000 objects): no crash or hang.
+     - Hostile files peak at 535 MB, the same as 0.6.2 run on the same files (the font bomb in both).
+     - The fan-out file, killed at 5 minutes in 0.6.2, now takes 3.3 s.
+     - The 500,000-object file (74 MB, 166,000 pages): analysis 25 s and 3.5 GB (0.6.2: 25 s and 4.4 GB).
+       A Small save takes 6.7 s and 2.8 GB (0.6.2: 6.0 s and 2.2 GB); reading the copy back for the checks
+       costs that extra half gigabyte.
+   - *qpdf corpus.* The qpdf test suite (630 PDFs at commit 4eba958) and 78 qpdf fuzz crashers, 708 files:
+     - no crash, hang or panic;
+     - analysis at most 579 MB and 0.86 s; 208 cleanly refused;
+     - compressed with Balanced, 500 copies written, 498 with exactly the original's text in MuPDF. The
+       other two are files MuPDF cannot read at all, whose copies show more text, not less, as in 0.6.2.
+     - Every file's outcome, error and output size is the same as 0.6.2. No check refused a file wrongly,
+       and no subsetting was undone. Only one written copy used subsetting, so the real test files above
+       exercise the letter check more.
+     - The renderer: at most 47 MB and 0.25 s.
+   - *Fuzzing.* 200,000 inputs from 1,250 seeds (qpdf files under 100 KB, plain and uncompressed with
+     `mutool clean -d`): no panic, hang or crash; at most 409 MB.
 
 ## 0.6.2, 24 October 2026
 

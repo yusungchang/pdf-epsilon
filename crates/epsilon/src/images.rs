@@ -228,6 +228,11 @@ fn process(doc: &Document, stream: &Stream, policy: &ImagePolicy, job: Job) -> O
         (deflate(pixels.as_bytes())?, "FlateDecode")
     };
 
+    // Read the new image back as a viewer will, and compare it with the pixels meant.
+    if !reads_back(&content, lossy, &pixels) {
+        return None;
+    }
+
     let worth_it = if was_jpeg && !downsample {
         (content.len() as f32) <= original_len as f32 * (1.0 - JPEG_REENCODE_MIN_SAVING)
     } else {
@@ -372,6 +377,41 @@ fn raw_image(data: &[u8], dict: &Dictionary, doc: &Document, space: Space, w: u3
     }
 }
 
+/// Largest average difference, per channel out of 255, allowed between a JPEG and the pixels
+/// it was made from. Quality 60 stays well under it on photographs.
+const JPEG_MAX_DIFFERENCE: f64 = 20.0;
+
+/// Whether `content` decodes back to `pixels`: exactly when lossless, closely when JPEG.
+/// Catches an encoder that wrote something other than the picture; the image is then kept.
+fn reads_back(content: &[u8], lossy: bool, pixels: &DynamicImage) -> bool {
+    let want = pixels.as_bytes();
+    if !lossy {
+        use std::io::Read;
+        let mut got = Vec::with_capacity(want.len());
+        let reader = flate2::read::ZlibDecoder::new(content).take(want.len() as u64 + 1);
+        return std::io::BufReader::new(reader).read_to_end(&mut got).is_ok() && got == want;
+    }
+    let Ok(img) = image::load_from_memory_with_format(content, ImageFormat::Jpeg) else { return false };
+    if img.width() != pixels.width() || img.height() != pixels.height() {
+        return false;
+    }
+    let got = match pixels {
+        DynamicImage::ImageLuma8(_) => img.to_luma8().into_raw(),
+        _ => img.to_rgb8().into_raw(),
+    };
+    if got.len() != want.len() {
+        return false;
+    }
+    // A sample of about 200,000 values is plenty to tell a picture from a broken one.
+    let step = (want.len() / 200_000).max(1);
+    let (mut sum, mut n) = (0u64, 0u64);
+    for i in (0..want.len()).step_by(step) {
+        sum += (want[i] as i32 - got[i] as i32).unsigned_abs() as u64;
+        n += 1;
+    }
+    n > 0 && sum as f64 / n as f64 <= JPEG_MAX_DIFFERENCE
+}
+
 /// Counts distinct colours on a sample. Screenshots, charts and line art have few;
 /// JPEG would put ringing round their edges, so they stay lossless.
 fn looks_photographic(img: &DynamicImage) -> bool {
@@ -450,5 +490,30 @@ fn colour_space(doc: &Document, dict: &Dictionary, is_soft_mask: bool) -> Option
             _ => None,
         },
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn gradient(w: u32, h: u32, shift: u32) -> DynamicImage {
+        DynamicImage::ImageRgb8(RgbImage::from_fn(w, h, |x, y| image::Rgb([(x * 2 + shift) as u8, (y * 2) as u8, ((x + y + shift) / 2) as u8])))
+    }
+
+    #[test]
+    fn new_images_are_read_back_before_they_are_used() {
+        let picture = gradient(120, 80, 0);
+        let good = jpeg(&picture, 60).unwrap();
+        assert!(reads_back(&good, true, &picture));
+        // A JPEG of another picture, or of the wrong size, is refused.
+        assert!(!reads_back(&jpeg(&gradient(120, 80, 128), 60).unwrap(), true, &picture));
+        assert!(!reads_back(&jpeg(&gradient(119, 80, 0), 60).unwrap(), true, &picture));
+        // Lossless must match exactly.
+        let exact = deflate(picture.as_bytes()).unwrap();
+        assert!(reads_back(&exact, false, &picture));
+        let mut off = picture.as_bytes().to_vec();
+        off[7] ^= 1;
+        assert!(!reads_back(&deflate(&off).unwrap(), false, &picture));
     }
 }

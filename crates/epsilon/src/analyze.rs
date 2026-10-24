@@ -320,8 +320,9 @@ pub fn analyze_bytes_with_progress(input: &[u8], progress: &(dyn Fn(f32) + Sync)
     tracker.set(0, 0.0);
 
     // Large documents run the presets one after another: each copy of a document costs a few
-    // kilobytes per object, and five at once is too much for files with hundreds of thousands.
-    if doc.objects.len() > crate::limits::PARALLEL_OBJECTS {
+    // kilobytes per object and holds every stream, and five at once is too much for files with
+    // hundreds of thousands of objects or hundreds of megabytes.
+    if doc.objects.len() > crate::limits::PARALLEL_OBJECTS || input.len() > crate::limits::PARALLEL_BYTES {
         let mut a = Inspector::new(input, &doc, &tracker).inspect();
         let runs: Vec<Result<Run>> = Preset::ALL
             .iter()

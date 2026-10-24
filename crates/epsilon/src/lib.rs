@@ -29,6 +29,7 @@ mod limits;
 mod placement;
 mod revisions;
 mod subset;
+mod verify;
 
 use std::path::Path;
 
@@ -152,6 +153,10 @@ pub struct Report {
     pub objects_removed: u32,
     /// True when the optimised file was not smaller and the original bytes were kept.
     pub kept_original: bool,
+    /// True when subsetting was undone because the check found a glyph in use removed.
+    /// See `verify.rs`.
+    #[serde(default)]
+    pub fonts_restored: bool,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -277,6 +282,8 @@ fn optimize(input: &[u8], mut doc: Document, options: &Options, progress: &dyn F
         return Err(Error::Damaged(lost));
     }
     let mut report = Report { input_bytes: input.len() as u64, ..Report::default() };
+    // Counted before anything changes, and compared with the saved copy below.
+    let counts = verify::counts(&doc);
     let pages = doc.get_pages().len() as u32;
     report.pages = pages;
     let objects_before = doc.objects.len();
@@ -285,8 +292,13 @@ fn optimize(input: &[u8], mut doc: Document, options: &Options, progress: &dyn F
 
     let mut changed = Vec::new();
     if let Some(policy) = &options.images {
-        let sizes = placement::display_sizes(&doc);
+        let mut sizes = placement::display_sizes(&doc);
         let fallback = placement::largest_page(&doc);
+        // An image also shown in an annotation, pattern or soft mask may be drawn larger there.
+        for id in placement::images_outside_content(&doc) {
+            let s = sizes.entry(id).or_insert(fallback);
+            *s = (s.0.max(fallback.0), s.1.max(fallback.1));
+        }
         let stats = images::recompress(&mut doc, policy, &sizes, fallback, &|f| progress(0.05 + 0.75 * f));
         report.images_seen = stats.seen;
         report.images_downsampled = stats.downsampled;
@@ -297,7 +309,20 @@ fn optimize(input: &[u8], mut doc: Document, options: &Options, progress: &dyn F
     }
 
     progress(0.8);
-    let subsets = if options.subset_fonts { subset::subset_fonts(&mut doc) } else { Vec::new() };
+    let subsets = if options.subset_fonts {
+        let (changes, undo) = subset::subset_fonts(&mut doc);
+        // Every glyph a page draws must still be there; if not, the fonts stay whole.
+        match verify::glyphs_kept(&doc, &undo.programs) {
+            Ok(()) => changes,
+            Err(_) => {
+                undo.restore(&mut doc);
+                report.fonts_restored = true;
+                Vec::new()
+            }
+        }
+    } else {
+        Vec::new()
+    };
     report.fonts_subset = subsets.len() as u32;
     let slimmed = if options.strip_font_tables { fonts::strip_tables(&mut doc) } else { Vec::new() };
     report.fonts_slimmed = slimmed.len() as u32;
@@ -314,12 +339,14 @@ fn optimize(input: &[u8], mut doc: Document, options: &Options, progress: &dyn F
     let out = save(&mut doc)?;
     progress(0.97);
 
-    // Verify: the result must parse and have the same pages.
+    // Verify: the result must parse and have the same pages, annotations, resources,
+    // bookmarks, form fields, attachments and destinations. See verify.rs.
     let check = load_bounded(&out).map_err(|e| Error::Verify(e.to_string()))?;
     let check_pages = check.get_pages().len() as u32;
     if check_pages != pages {
         return Err(Error::Verify(format!("{check_pages} pages instead of {pages}")));
     }
+    verify::compare(&counts, &verify::counts(&check)).map_err(Error::Verify)?;
 
     if out.len() >= input.len() {
         report.output_bytes = input.len() as u64;
@@ -438,6 +465,11 @@ fn has_encrypt_entry(bytes: &[u8]) -> bool {
 }
 
 fn save(doc: &mut Document) -> Result<Vec<u8>> {
+    // The copy is one complete revision. Pointers to the original's earlier cross-reference
+    // sections would point into nothing (lopdf keeps them from the input's trailer when it
+    // could not follow them), and a reader then fails to open the copy.
+    doc.trailer.remove(b"Prev");
+    doc.trailer.remove(b"XRefStm");
     // Object streams and cross-reference streams; lopdf raises the version to 1.5.
     let mut out = Vec::new();
     doc.save_modern(&mut out).map_err(|e| Error::Verify(e.to_string()))?;

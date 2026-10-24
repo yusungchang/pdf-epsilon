@@ -4,6 +4,10 @@
 //! through `q`, `Q` and `cm`, and records the drawn size of each image XObject at
 //! each `Do`. Form XObjects are followed with their own matrix and resources.
 //! The largest drawn size of each image is what its resolution is judged against.
+//!
+//! A page's `/UserUnit` scales everything on it. Each page's walk has a budget of drawing
+//! operations, forms included, so a form drawn many times inside forms drawn many times cannot
+//! make the walk run for hours; a page over budget counts as unreadable.
 
 use std::collections::{HashMap, HashSet};
 
@@ -104,7 +108,20 @@ pub fn visit_page(doc: &Document, page_id: ObjectId, visit: &mut dyn FnMut(Draw)
     let Some(content) = crate::limits::page_content(doc, page_id) else { return false };
     let resources = page_resources(doc, page_id);
     let mut visiting = HashSet::new();
-    walk(doc, &content, &resources, Matrix::IDENTITY, visit, &mut visiting, 0)
+    let mut budget = crate::limits::PAGE_OPERATIONS;
+    let u = user_unit(doc, page_id);
+    walk(doc, &content, &resources, Matrix([u, 0.0, 0.0, u, 0.0, 0.0]), visit, &mut visiting, &mut budget, 0)
+}
+
+/// How many points one unit on this page is (`/UserUnit`, PDF 1.6). Large-format drawings use
+/// it to go beyond the 200-inch page limit.
+pub fn user_unit(doc: &Document, page_id: ObjectId) -> f32 {
+    doc.get_dictionary(page_id)
+        .ok()
+        .and_then(|p| p.get(b"UserUnit").ok())
+        .and_then(|o| number(deref(doc, o)))
+        .filter(|u| u.is_finite() && *u > 0.0 && *u <= 75_000.0)
+        .unwrap_or(1.0)
 }
 
 /// The page's resource dictionaries, nearest first (inherited ones follow).
@@ -148,6 +165,7 @@ fn walk(
     base: Matrix,
     visit: &mut dyn FnMut(Draw),
     visiting: &mut HashSet<ObjectId>,
+    budget: &mut usize,
     depth: u32,
 ) -> bool {
     if depth > 16 {
@@ -159,6 +177,11 @@ fn walk(
         return false;
     }
     let Ok(content) = Content::decode(content) else { return false };
+    if content.operations.len() > *budget {
+        *budget = 0;
+        return false;
+    }
+    *budget -= content.operations.len();
     let mut ctm = base;
     let mut stack: Vec<Matrix> = Vec::new();
 
@@ -209,9 +232,12 @@ fn walk(
                         // Forms without their own resources use the page's.
                         form_resources.extend_from_slice(resources);
                         if let Some(data) = crate::limits::decode(stream, crate::limits::CONTENT) {
-                            walk(doc, &data, &form_resources, matrix.then(ctm), visit, visiting, depth + 1);
+                            walk(doc, &data, &form_resources, matrix.then(ctm), visit, visiting, budget, depth + 1);
                         }
                         visiting.remove(&id);
+                        if *budget == 0 {
+                            return false;
+                        }
                     }
                     _ => {}
                 }
@@ -229,7 +255,8 @@ pub fn largest_page(doc: &Document) -> Size {
     let mut found = false;
     for (_, page_id) in doc.get_pages() {
         let Some(rect) = page_box(doc, page_id, b"MediaBox") else { continue };
-        let (w, h) = ((rect[2] - rect[0]).abs(), (rect[3] - rect[1]).abs());
+        let u = user_unit(doc, page_id);
+        let (w, h) = ((rect[2] - rect[0]).abs() * u, (rect[3] - rect[1]).abs() * u);
         if !found {
             best = (w, h);
             found = true;
@@ -243,9 +270,93 @@ pub fn largest_page(doc: &Document) -> Size {
 }
 
 /// The visible area of a page: its crop box, or its media box when it has none.
+/// In points, like the matrices `visit_page` reports (so `/UserUnit` is applied).
 pub fn visible_box(doc: &Document, page_id: ObjectId) -> Option<[f32; 4]> {
     let b = page_box(doc, page_id, b"CropBox").or_else(|| page_box(doc, page_id, b"MediaBox"))?;
-    Some([b[0].min(b[2]), b[1].min(b[3]), b[0].max(b[2]), b[1].max(b[3])])
+    let u = user_unit(doc, page_id);
+    Some([b[0].min(b[2]) * u, b[1].min(b[3]) * u, b[0].max(b[2]) * u, b[1].max(b[3]) * u])
+}
+
+/// Images drawn somewhere `visit_page` does not measure: annotation appearances, tiling
+/// patterns, soft-mask groups and Type 3 glyphs. Their size there is unknown, so they must not
+/// be judged by the size found on the page alone.
+pub fn images_outside_content(doc: &Document) -> HashSet<ObjectId> {
+    let mut g = Gather { out: HashSet::new(), seen: HashSet::new(), nodes: 0 };
+    for (_, page_id) in doc.get_pages() {
+        for res in page_resources(doc, page_id) {
+            g.resources(doc, &res, false, 0);
+        }
+        let annots = doc.get_dictionary(page_id).ok().and_then(|p| p.get(b"Annots").ok()).and_then(|o| deref(doc, o).as_array().ok());
+        for a in annots.into_iter().flatten() {
+            let Some(ap) = deref(doc, a).as_dict().ok().and_then(|a| a.get(b"AP").ok()).and_then(|o| deref(doc, o).as_dict().ok()) else { continue };
+            for (_, v) in ap.iter() {
+                match deref(doc, v) {
+                    Object::Stream(_) => g.stream(doc, v, true, 0),
+                    Object::Dictionary(states) => states.iter().for_each(|(_, s)| g.stream(doc, s, true, 0)),
+                    _ => {}
+                }
+            }
+        }
+    }
+    g.out
+}
+
+struct Gather {
+    out: HashSet<ObjectId>,
+    seen: HashSet<(ObjectId, bool)>,
+    nodes: usize,
+}
+
+impl Gather {
+    /// A form, pattern, group or glyph stream: its own resources, `outside` the page content
+    /// when it is reached from somewhere `visit_page` does not walk.
+    fn stream(&mut self, doc: &Document, obj: &Object, outside: bool, depth: u32) {
+        let Ok(id) = obj.as_reference() else { return };
+        self.nodes += 1;
+        if depth > 16 || self.nodes > 1_000_000 || !self.seen.insert((id, outside)) {
+            return;
+        }
+        let res = match doc.get_object(id) {
+            Ok(Object::Stream(s)) => s.dict.get(b"Resources").ok(),
+            Ok(Object::Dictionary(d)) => d.get(b"Resources").ok(),
+            _ => None,
+        };
+        if let Some(res) = res.and_then(|r| deref(doc, r).as_dict().ok()) {
+            let res = res.clone();
+            self.resources(doc, &res, outside, depth + 1);
+        }
+    }
+
+    fn resources(&mut self, doc: &Document, res: &Dictionary, outside: bool, depth: u32) {
+        let entries = |kind: &[u8]| -> Vec<Object> {
+            res.get(kind).ok().and_then(|o| deref(doc, o).as_dict().ok()).map(|d| d.iter().map(|(_, v)| v.clone()).collect()).unwrap_or_default()
+        };
+        for v in entries(b"XObject") {
+            let Ok(Object::Stream(s)) = v.as_reference().and_then(|id| doc.get_object(id)) else { continue };
+            match s.dict.get(b"Subtype").and_then(|o| o.as_name()) {
+                Ok(b"Image") if outside => {
+                    self.out.insert(v.as_reference().unwrap());
+                }
+                Ok(b"Form") => self.stream(doc, &v, outside, depth),
+                _ => {}
+            }
+        }
+        for v in entries(b"Pattern") {
+            self.stream(doc, &v, true, depth);
+        }
+        for v in entries(b"ExtGState") {
+            let group = deref(doc, &v).as_dict().ok().and_then(|g| g.get(b"SMask").ok()).and_then(|m| deref(doc, m).as_dict().ok()).and_then(|m| m.get(b"G").ok()).cloned();
+            if let Some(g) = group {
+                self.stream(doc, &g, true, depth);
+            }
+        }
+        for v in entries(b"Font") {
+            let type3 = matches!(deref(doc, &v).as_dict().ok().and_then(|f| f.get(b"Subtype").ok()).and_then(|o| o.as_name().ok()), Some(b"Type3"));
+            if type3 {
+                self.stream(doc, &v, true, depth);
+            }
+        }
+    }
 }
 
 /// A page box, inherited from the page tree when the page has none of its own.

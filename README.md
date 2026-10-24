@@ -67,8 +67,12 @@ Source: <https://github.com/yusungchang/pdf-epsilon>.
    into compressed object streams.
 
 Text, fonts, vector drawing, links, bookmarks, forms, annotations and attachments are
-kept. Every result is re-opened and its page count checked before it is saved. If the
-result is not smaller, nothing is written. A file that is partly damaged is never rewritten from a guess: it is left as it
+kept. Every result is checked before it is saved: it is re-opened, and it must have the same
+pages, annotations, page resources, bookmarks, form fields, attachments and named destinations
+as the original. After fonts are trimmed, the text is read again and every letter a page draws
+must still be in its font; if one is not, the fonts are kept whole. Each recompressed image is
+decoded again and compared with the picture it should hold. If the result is not smaller,
+nothing is written. A file that is partly damaged is never rewritten from a guess: it is left as it
 is. **Check for updates** (the round arrow in the header) asks GitHub for the newest version
 number only when clicked; nothing about any file is ever sent.
 

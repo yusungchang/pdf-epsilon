@@ -38,10 +38,15 @@ fn stream(dict: &str, data: &[u8]) -> Vec<u8> {
 
 /// A one-page PDF. `objects` are numbered from 5; 1–4 are the catalog, page tree, page and content.
 fn pdf(resources: &str, content: Vec<u8>, catalog: &str, objects: Vec<Vec<u8>>) -> Vec<u8> {
+    pdf_with_page("", resources, content, catalog, objects)
+}
+
+/// The same, with more entries in the page dictionary (`/Annots`, say).
+fn pdf_with_page(page: &str, resources: &str, content: Vec<u8>, catalog: &str, objects: Vec<Vec<u8>>) -> Vec<u8> {
     let mut objs: Vec<Vec<u8>> = vec![
         format!("<< /Type /Catalog /Pages 2 0 R {catalog} >>").into_bytes(),
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_vec(),
-        format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << {resources} >> /Contents 4 0 R >>").into_bytes(),
+        format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] {page} /Resources << {resources} >> /Contents 4 0 R >>").into_bytes(),
         content,
     ];
     objs.extend(objects);
@@ -94,6 +99,13 @@ fn cases() -> Vec<(&'static str, Vec<u8>)> {
     bad_font.extend_from_slice(&[0; 54]);
     bad_font.extend_from_slice(b"\0\0\x50\0\xff\xff");
     bad_font.extend_from_slice(&[0; 12]);
+    // Ten forms, each drawing the next ten times: ten billion draws from a 2 KB file.
+    let mut fan = Vec::new();
+    for i in 0..10 {
+        let next = if i < 9 { format!("/Resources << /XObject << /Fm {} 0 R >> >>", 6 + i) } else { String::new() };
+        let body: &[u8] = if i < 9 { b"/Fm Do /Fm Do /Fm Do /Fm Do /Fm Do /Fm Do /Fm Do /Fm Do /Fm Do /Fm Do" } else { b"0 0 1 1 re f" };
+        fan.push(stream(&format!("/Type /XObject /Subtype /Form /BBox [0 0 1 1] {next}"), body));
+    }
     let xref_predictor = {
         let mut b = b"%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [] /Count 0 >>\nendobj\n".to_vec();
         let x = b.len();
@@ -117,6 +129,18 @@ fn cases() -> Vec<(&'static str, Vec<u8>)> {
         ("image with too little data", pdf("/XObject << /Im 5 0 R >>", stream("", &draw_image), "", vec![stream("/Type /XObject /Subtype /Image /Width 2000000000 /Height 2000000000 /ColorSpace /DeviceRGB /BitsPerComponent 8", &[0; 100])])),
         ("form drawing itself", pdf("/XObject << /Fm 5 0 R >>", stream("", b"/Fm Do"), "", vec![stream("/Type /XObject /Subtype /Form /BBox [0 0 1 1] /Resources << /XObject << /Fm 5 0 R >> >>", b"/Fm Do /Fm Do")])),
         ("2000 nested forms", pdf("/XObject << /Fm 5 0 R >>", stream("", b"/Fm Do"), "", chain)),
+        ("forms fanned out ten levels deep", pdf("/XObject << /Fm 5 0 R >>", stream("", b"/Fm Do"), "", fan)),
+        // The structure check and the image-size walk read these; each loops back to itself.
+        ("bookmark that is its own next", pdf("", stream("", b"BT ET"), "/Outlines 5 0 R", vec![b"<< /First 6 0 R >>".to_vec(), b"<< /Title (a) /Next 6 0 R /First 6 0 R >>".to_vec()])),
+        ("form field that is its own kid", pdf("", stream("", b"BT ET"), "/AcroForm << /Fields [5 0 R] >>", vec![b"<< /T (a) /Kids [5 0 R 5 0 R] >>".to_vec()])),
+        ("name tree containing itself", pdf("", stream("", b"BT ET"), "/Names << /EmbeddedFiles 5 0 R /Dests 5 0 R >>", vec![b"<< /Kids [5 0 R 5 0 R] /Names [(a) 5 0 R] >>".to_vec()])),
+        ("appearance drawing itself", pdf_with_page("/Annots [10 0 R]", TYPE0, stream("", b"BT /F1 12 Tf <0001> Tj ET"), "", {
+            // 5–9: a Type 0 font; 10: a stamp; 11: its appearance, which draws itself twice.
+            let mut o = type0(stream("/Length1 4", b"\0\x01\0\0"), b"/Identity".to_vec());
+            o.push(b"<< /Type /Annot /Subtype /Stamp /Rect [0 0 9 9] /AP << /N 11 0 R /D << /a 11 0 R /b 11 0 R >> >> >>".to_vec());
+            o.push(stream("/Type /XObject /Subtype /Form /BBox [0 0 9 9] /Resources << /XObject << /Fm 11 0 R >> /Pattern << /P 11 0 R >> /Font << /F1 5 0 R >> >>", b"/Fm Do /Fm Do BT /F1 9 Tf <0001> Tj ET"));
+            o
+        })),
         ("page tree containing itself", {
             let mut p = page_with(b"BT ET");
             let at = p.windows(9).position(|w| w == b"/Kids [3 ").unwrap();

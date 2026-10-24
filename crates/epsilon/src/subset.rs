@@ -25,9 +25,28 @@ use crate::fonts::{self, Change, Table};
 use crate::limits;
 use crate::placement::{deref, lookup, page_resources};
 
-/// Subsets every font this module can handle. Returns the font programs that shrank.
-pub fn subset_fonts(doc: &mut Document) -> Vec<Change> {
-    let Some(usage) = Usage::collect(doc) else { return Vec::new() };
+/// What subsetting replaced, so it can be put back if the check in `verify.rs` fails.
+#[derive(Default)]
+pub struct Undo {
+    /// Every object changed, as it was.
+    objects: Vec<(ObjectId, Object)>,
+    /// The font programs that were subset, decoded, as they were.
+    pub programs: HashMap<ObjectId, Vec<u8>>,
+}
+
+impl Undo {
+    pub fn restore(self, doc: &mut Document) {
+        for (id, obj) in self.objects {
+            doc.objects.insert(id, obj);
+        }
+    }
+}
+
+/// Subsets every font this module can handle. Returns the font programs that shrank, and
+/// what they replaced.
+pub fn subset_fonts(doc: &mut Document) -> (Vec<Change>, Undo) {
+    let mut undo = Undo::default();
+    let Some(usage) = Usage::collect(doc) else { return (Vec::new(), undo) };
 
     // Group the eligible font dictionaries by the program they embed: some producers point
     // many font dictionaries at one program, and all of their glyphs must stay.
@@ -111,11 +130,17 @@ pub fn subset_fonts(doc: &mut Document) -> Vec<Change> {
         let mut new_stream = Stream::new(dict, encoded);
         new_stream.allows_compression = false;
         let after = new_stream.content.len();
+        let fonts = p.fonts.clone();
+        for id in std::iter::once(program_id).chain(fonts.iter().flat_map(|(f, d, x)| [Some(*f), *d, *x]).flatten()) {
+            if let Ok(obj) = doc.get_object(id) {
+                undo.objects.push((id, obj.clone()));
+            }
+        }
+        undo.programs.insert(program_id, data);
         doc.objects.insert(program_id, Object::Stream(new_stream));
 
         // ISO 32000-1 9.6.4: a subset font's name starts with a six-letter tag.
         let tag = subset_tag(&p.gids);
-        let fonts = p.fonts.clone();
         for (font_id, descendant, descriptor) in fonts {
             tag_name(doc, font_id, b"BaseFont", &tag);
             if let Some(id) = descendant {
@@ -127,7 +152,7 @@ pub fn subset_fonts(doc: &mut Document) -> Vec<Change> {
         }
         changes.push(Change { id: program_id, before, after });
     }
-    changes
+    (changes, undo)
 }
 
 /// Descriptors written inline in the descendant font have no id; match them by content.

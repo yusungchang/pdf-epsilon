@@ -270,3 +270,97 @@ fn font_selected_inside_q_does_not_steal_glyphs_after_q() {
     let glyphs = glyphs_by_font(&out);
     assert_eq!(glyphs, vec![("Alpha".to_string(), vec![3, 5]), ("Beta".to_string(), vec![4])]);
 }
+
+// ---------- 3. images measured where they are really drawn (0.7.0) ----------
+
+/// The 600 × 400 photo drawn `w` × `h` units on the page, optionally on a page with
+/// `/UserUnit`, and optionally also in a stamp annotation 600 × 400 points large.
+fn placed_pdf(w: i64, h: i64, user_unit: Option<f64>, stamp: bool) -> Vec<u8> {
+    let mut doc = Document::with_version("1.7");
+    let pages_id = doc.new_object_id();
+    let mut z = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+    z.write_all(&photo()).unwrap();
+    let mut image = Stream::new(
+        dictionary! { "Type" => "XObject", "Subtype" => "Image", "Width" => W as i64, "Height" => H as i64,
+                      "ColorSpace" => "DeviceRGB", "BitsPerComponent" => 8, "Filter" => "FlateDecode" },
+        z.finish().unwrap(),
+    );
+    image.allows_compression = false;
+    let image_id = doc.add_object(image);
+    let content = doc.add_object(Stream::new(dictionary! {}, format!("q {w} 0 0 {h} 0 0 cm /Im Do Q").into_bytes()));
+    let mut page = dictionary! {
+        "Type" => "Page", "Parent" => pages_id, "Contents" => content,
+        "Resources" => dictionary! { "XObject" => dictionary! { "Im" => image_id } },
+        "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+    };
+    if let Some(u) = user_unit {
+        page.set("UserUnit", u);
+    }
+    if stamp {
+        let appearance = doc.add_object(Stream::new(
+            dictionary! { "Type" => "XObject", "Subtype" => "Form", "BBox" => vec![0.into(), 0.into(), 600.into(), 400.into()],
+                          "Resources" => dictionary! { "XObject" => dictionary! { "Im" => image_id } } },
+            b"q 600 0 0 400 0 0 cm /Im Do Q".to_vec(),
+        ));
+        let annot = doc.add_object(dictionary! {
+            "Type" => "Annot", "Subtype" => "Stamp", "Rect" => vec![0.into(), 0.into(), 600.into(), 400.into()],
+            "AP" => dictionary! { "N" => appearance },
+        });
+        page.set("Annots", vec![annot.into()]);
+    }
+    let page = doc.add_object(page);
+    doc.objects.insert(pages_id, Object::Dictionary(dictionary! { "Type" => "Pages", "Kids" => vec![page.into()], "Count" => 1 }));
+    let catalog = doc.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
+    doc.trailer.set("Root", catalog);
+    let mut out = Vec::new();
+    doc.save_to(&mut out).unwrap();
+    out
+}
+
+fn image_size(pdf: &[u8]) -> (i64, i64) {
+    let doc = Document::load_mem(pdf).unwrap();
+    let s = doc.objects.values().filter_map(|o| o.as_stream().ok()).find(|s| s.dict.get(b"Subtype").and_then(|n| n.as_name()).ok() == Some(b"Image")).unwrap();
+    (s.dict.get(b"Width").unwrap().as_i64().unwrap(), s.dict.get(b"Height").unwrap().as_i64().unwrap())
+}
+
+#[test]
+fn user_unit_scales_the_drawn_size() {
+    // Drawn 60 × 40 units of 10 points: 600 × 400 points, so 72 ppi, with nothing to downsample.
+    let (out, _) = compress_bytes(&placed_pdf(60, 40, Some(10.0), false), &Preset::Balanced.options()).unwrap();
+    assert_eq!(image_size(&out), (W as i64, H as i64));
+    // The same drawing without /UserUnit is small, and is downsampled.
+    let (out, _) = compress_bytes(&placed_pdf(60, 40, None, false), &Preset::Balanced.options()).unwrap();
+    assert!(image_size(&out).0 < W as i64);
+}
+
+#[test]
+fn images_also_shown_in_annotations_keep_the_detail_they_need_there() {
+    let (out, _) = compress_bytes(&placed_pdf(60, 40, None, true), &Preset::Balanced.options()).unwrap();
+    assert_eq!(image_size(&out), (W as i64, H as i64));
+}
+
+// ---------- 4. structure kept ----------
+
+#[test]
+fn annotations_survive_and_are_counted() {
+    let input = placed_pdf(60, 40, None, true);
+    let (out, _) = compress_bytes(&input, &Preset::Small.options()).unwrap();
+    let doc = Document::load_mem(&out).unwrap();
+    let page = doc.get_pages().into_values().next().unwrap();
+    let annots = doc.get_dictionary(page).unwrap().get(b"Annots").unwrap().as_array().unwrap().len();
+    assert_eq!(annots, 1);
+}
+
+// ---------- 5. a copy is one complete revision ----------
+
+#[test]
+fn copies_do_not_point_at_the_originals_earlier_revisions() {
+    // lopdf keeps /Prev from the input's trailer when it cannot follow it; written into the copy,
+    // it points into nothing and the copy cannot be read back. This file is from the qpdf test
+    // suite (qtest/qpdf/minimal-linearize-pass1.pdf, Apache License 2.0).
+    let input = include_bytes!("data/qpdf-minimal-linearize-pass1.pdf");
+    let (out, report) = compress_bytes(input, &Preset::Balanced.options()).expect("a copy is written");
+    assert!(!report.kept_original);
+    assert!(Document::load_mem(&out).is_ok());
+    assert!(!out.windows(5).any(|w| w == b"/Prev"));
+}

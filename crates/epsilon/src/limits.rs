@@ -18,6 +18,9 @@ pub const FILE: u64 = 2 << 30;
 pub const OBJECTS: usize = 1_000_000;
 /// Documents with more objects than this are analysed one preset at a time, not in parallel.
 pub const PARALLEL_OBJECTS: usize = 100_000;
+/// Files larger than this are analysed one preset at a time too: each run holds its own copy
+/// of every stream, and a 293 MB file run four at once peaked at 2.7 GB.
+pub const PARALLEL_BYTES: usize = 150 << 20;
 /// Any one decoded stream, and every stream decoded while loading (object and xref streams).
 pub const STREAM: usize = 256 << 20;
 /// A page's content, or one form XObject, pattern or appearance stream.
@@ -25,6 +28,9 @@ pub const CONTENT: usize = 64 << 20;
 /// Drawing operations in one content stream, estimated before decoding. Decoded operations
 /// take a few hundred bytes each, far more than their text.
 pub const OPERATIONS: usize = 1_000_000;
+/// Drawing operations read for one page, its forms included. A form drawn inside forms drawn
+/// many times multiplies the work; past this, the page counts as unreadable.
+pub const PAGE_OPERATIONS: usize = 2_000_000;
 /// An embedded font program. Whole CJK fonts reach about 25 MB.
 pub const FONT: usize = 128 << 20;
 /// Metadata and CID-to-glyph maps (at most 128 KB when valid).

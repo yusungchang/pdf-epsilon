@@ -95,5 +95,9 @@ came from comparing it with existing tools and reports:
 
 - Clipping paths are ignored when measuring the visible share of an image, so the real share can be smaller.
 - Images and content in annotation appearances, patterns and Type 3 fonts are counted, but not placed on a page.
+  Since 0.7.0 such an image is never downsampled below the largest page's size, since it may be drawn
+  larger there.
 - Fonts used only by form fields can look unused.
-- No rendered comparison yet. Verification is still a reload and page-count check, plus `mutool` by hand.
+- No rendered comparison yet. Since 0.7.0 every copy gets automatic checks (`verify.rs`): structure counts
+  on the reloaded copy, every drawn glyph still present after subsetting, and each new image decoded again.
+  `mutool` text and render comparisons are still run by hand.
