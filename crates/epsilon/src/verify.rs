@@ -451,7 +451,7 @@ mod tests {
         let mut doc = Document::with_version("1.7");
         let pages = doc.new_object_id();
         let file = doc.add_object(Stream::new(dictionary! {}, program));
-        let mut type0 = |doc: &mut Document, file: ObjectId| {
+        let type0 = |doc: &mut Document, file: ObjectId| {
             let descriptor = doc.add_object(dictionary! { "Type" => "FontDescriptor", "FontFile2" => file });
             let cid = doc.add_object(dictionary! { "Type" => "Font", "Subtype" => "CIDFontType2", "FontDescriptor" => descriptor });
             doc.add_object(dictionary! { "Type" => "Font", "Subtype" => "Type0", "Encoding" => "Identity-H", "DescendantFonts" => vec![cid.into()] })
