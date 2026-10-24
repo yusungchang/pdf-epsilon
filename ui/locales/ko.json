@@ -173,7 +173,9 @@
   "compare.hintSide": "저장하면 여기 보이는 버전이 그대로 저장됩니다.",
 
   "compare.pageButton": "페이지 비교",
-  "compare.pageTitle": "{page}/{total}쪽: 원본과 [[{settings}]]",
+  "compare.title": "원본과 [[{settings}]]",
+  "compare.pageOf": "{page}/{total}쪽",
+  "compare.pagesButton": "페이지 비교",
   "compare.preparing": "이 설정으로 압축하는 중…",
   "compare.prev": "이전 페이지",
   "compare.next": "다음 페이지",

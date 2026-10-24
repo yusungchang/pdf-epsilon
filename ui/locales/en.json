@@ -173,7 +173,9 @@
   "compare.hintSide": "Saving writes exactly the version shown here.",
 
   "compare.pageButton": "Compare page",
-  "compare.pageTitle": "Page {page} of {total}: original and [[{settings}]]",
+  "compare.title": "Original and [[{settings}]]",
+  "compare.pageOf": "Page {page} of {total}",
+  "compare.pagesButton": "Compare pages",
   "compare.preparing": "Compressing with these settings…",
   "compare.prev": "Previous page",
   "compare.next": "Next page",

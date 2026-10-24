@@ -845,11 +845,9 @@ function pageDetail(p, i, images, fonts) {
   const size = t("page.size", { width: Math.round(p.width / 72 * 25.4), height: Math.round(p.height / 72 * 25.4) });
   const parts = PARTS.filter(([k]) => p[k]).map(([k, , label]) => t("page.part", { part: t(label), size: { bytes: p[k] } }));
   const facts = el("p", "pd-facts", `${size} · ${parts.join(" · ") || t("page.empty")}`);
-  const cmpPage = el("button", "compare-btn");
-  cmpPage.type = "button";
-  cmpPage.append(icon("compare"), el("span", "", t("compare.pageButton")));
-  cmpPage.onclick = () => openCompare(f, p.number);
-  info.append(facts, cmpPage);
+  // One "Compare pages" button sits above the list (the comparison moves between pages itself),
+  // and the thumbnail beside these facts opens this page.
+  info.append(facts);
 
   if (p.issues.length) {
     const ul = el("ul", "pd-issues");
@@ -961,6 +959,7 @@ async function openCompare(f, page) {
   const next = el("button", "cmp-step", "›");
   for (const [b, key, d] of [[prev, "compare.prev", -1], [next, "compare.next", 1]]) {
     b.type = "button";
+    b.dataset.focus = `compare:${key}`;
     b.setAttribute("aria-label", t(key));
     b.title = t(key);
     // Each page is drawn at its own proportions, not those of the page before.
@@ -973,13 +972,14 @@ async function openCompare(f, page) {
   close.setAttribute("aria-label", t("compare.close"));
   close.onclick = () => dlg.close();
   let prepareTicket = null;
+  dlg.onkeydown = null;
   dlg.onclose = () => {
     // Closing stops the smaller copy still being made.
     cancelWork(prepareTicket);
     resizeWatch?.disconnect();
     document.documentElement.classList.remove("modal-open");
   };
-  nav.append(prev, next, close);
+  nav.append(close);
   head.append(title, nav);
   const body = el("div", "cmp-body");
   dlg.replaceChildren(head, body);
@@ -1007,7 +1007,7 @@ async function openCompare(f, page) {
   } catch (e) {
     prepareTicket = null;
     if (!current()) return;
-    rich(title, t("compare.pageTitle", { page, total: f.analysis.pages.length, settings: settingsLabel() }));
+    rich(title, t("compare.title", { settings: settingsLabel() }));
     body.replaceChildren(el("p", "error", errorText(e)));
     return;
   }
@@ -1020,6 +1020,16 @@ async function openCompare(f, page) {
   const captions = el("div", "cmp-captions");
   const note = el("p", "hint");
   body.replaceChildren(toolbar, scroller, captions, note);
+  // Moving between pages: "‹ Page 3 of 12 ›" at the end of the toolbar, and the arrow keys.
+  const pager = el("div", "cmp-pager");
+  const pageOf = el("span", "cmp-page-of");
+  pager.append(prev, pageOf, next);
+  dlg.onkeydown = (e) => {
+    // The swipe divider and other inputs use the arrow keys themselves.
+    if (e.target.closest("input, select, textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
+    const b = e.key === "ArrowLeft" ? prev : e.key === "ArrowRight" ? next : null;
+    if (b && !b.disabled) { e.preventDefault(); b.click(); }
+  };
 
   const segmented = (items, current, set) => {
     const g = el("div", "segmented");
@@ -1036,7 +1046,7 @@ async function openCompare(f, page) {
 
   async function draw() {
     const p = a.pages[view.page - 1];
-    rich(title, t("compare.pageTitle", { page: view.page, total, settings: settingsLabel() }));
+    rich(title, t("compare.title", { settings: settingsLabel() }));
     prev.disabled = view.page <= 1;
     next.disabled = view.page >= total;
 
@@ -1056,7 +1066,9 @@ async function openCompare(f, page) {
         view.recentre = true;
       }),
       diffToggle,
+      pager,
     ));
+    pageOf.textContent = t("compare.pageOf", { page: view.page, total });
 
     const lean = report.keptOriginal;
     const pageSaving = state.custom ? 0 : p.savings[presetIndex()];
@@ -1557,6 +1569,11 @@ async function init() {
     const pages = pressed("only-issues") ? a.pages.filter((p) => p.issues.length) : a.pages;
     for (const p of pages) state.open.add(p.number);
     renderPages(a);
+  });
+  // Opens the comparison at page 1; it moves between pages itself.
+  $("compare-pages").addEventListener("click", () => {
+    const f = state.files[state.current];
+    if (f?.status === "ready") openCompare(f, 1);
   });
   $("collapse-all").addEventListener("click", () => { state.open.clear(); renderPages(state.files[state.current].analysis); });
 

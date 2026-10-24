@@ -18,8 +18,29 @@
 | 0.9.1 | 2026-10-24 | Comparison of cloud files fixed; preset names as tags; version shown; Korean labels; full regression against 0.6.0. |
 | 0.10.0 | 2026-10-24 | Faster: images on every core, a SIMD resizer, shared work in analyses, a lookup table in the operation count; memory sized to the computer. Analysis 1.8×, saving 2.0× against 0.9.0. |
 | 0.11.0 | 2026-10-25 | Released as a minor version at the owner's request (built locally as 0.10.1). Comparison pictures no longer lost when they arrive after the reply (the cause of "could not be rendered", worst at 2× and 4×). "Details" starts closed; no focus ring on the comparison's close button when it opens. |
+| 0.11.1 | 2026-10-25 | One "Compare pages" button above the page list instead of one per page; page arrows in the comparison moved into the toolbar as "‹ Page 3 of 12 ›", with the arrow keys. |
 | 0.5.0 | 2026-10-21 | 0.4.1 released as a minor version at the owner's request; first-launch steps shown on every download; security review. |
 | 0.4.1 | 2026-10-21 | Long file names truncate on every WebKit, a round handle on the comparison divider, glass-finish icon, a product page on GitHub Pages, findings and pages folded under Advanced. |
+
+## 0.11.1, 25 October 2026
+
+**Page comparison buttons, at the owner's request.**
+
+- *Before:* every opened page in "Page by page" had its own "Compare page" button, although the
+  comparison window moves between pages itself. In that window, the page arrows were two faint
+  glyphs beside the close button, and the page number was part of the title.
+- *Page list:* one "Compare pages" button now sits at the top of "Page by page", before the list tools,
+  and opens the comparison at page 1. The per-page button is gone; clicking a page's thumbnail still
+  opens that page.
+- *Comparison window:* the arrows moved into the toolbar, at its right end, as a framed control
+  "‹ Page 3 of 12 ›" in the same style as the zoom and view switches. The left and right arrow keys
+  move between pages too, except while an input has focus (the swipe divider uses them). The title is
+  now "Original and [Balanced]", and the close button is alone in the top right.
+- *Text:* `compare.pageTitle` was replaced by `compare.title` and `compare.pageOf`; `compare.pagesButton`
+  is new. English and Korean ("원본과 [Balanced]", "3/12쪽", "페이지 비교").
+- *Tested:* `tests/locales.rs` passes. Screenshots from the harness of the page list and the comparison
+  (swipe, side by side, error) in both languages. The harness now opens "Details" directly, since the app
+  no longer remembers it open.
 
 ## 0.11.0, 25 October 2026
 
