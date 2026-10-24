@@ -20,12 +20,13 @@ macOS, Windows and Linux.
 
 | Attack | Defence |
 |---|---|
-| Memory corruption in the parser or decoders | The whole path is Rust: lopdf, `zlib-rs` for Flate in the app (`miniz_oxide` when the engine is built on its own), `zune-jpeg` for JPEG. There is no C parsing code. `zlib-rs` and `zune-jpeg` use `unsafe` for speed, so both decoders are covered by the hostile tests and the fuzz runs below. |
+| Memory corruption in the parser or decoders | The whole path is Rust: lopdf, `zlib-rs` for Flate in the app (`miniz_oxide` when the engine is built on its own), `zune-jpeg` for JPEG, `fast_image_resize` for downsampling (since 0.10.0, on pixels the engine has already decoded). There is no C parsing code. `zlib-rs` and `zune-jpeg` use `unsafe` for speed, so both decoders are covered by the hostile tests and the fuzz runs below. |
 | Decompression bomb (a small stream that inflates to gigabytes) | Every decode is bounded (see `crates/epsilon/src/limits.rs`). Streams loaded with the document: 256 MB. Page and form content: 64 MB. Fonts: 128 MB. Metadata and glyph maps: 16 MB. Images: never more than their own pixel count. Anything over a limit is left untouched. |
 | Huge predictor rows (`/Columns 2147483647`) | Implausible `/Columns`, `/Colors` and bit depths are refused, by a raw-byte check before loading and again before any decode. |
 | Millions of drawing operations in a short stream | Operations are counted before decoding; over 1 million, the content is treated as unreadable. |
 | Forms drawn many times inside forms drawn many times (2 KB that would take hours to walk) | Each page's walk has a budget of 2 million operations, forms included; past it, the page counts as unreadable. The walks for fonts and for the checks read each form once. |
 | Huge images (a JPEG claiming 65,000 × 65,000 pixels) | Images over 100 megapixels are left alone. The JPEG decoder also caps allocations at 512 MB. |
+| Many large images at once | Since 0.10.0 images are worked on in parallel, within a memory budget shared by the whole process: an eighth of installed memory, at most 768 MB, and at most a quarter of what is free; below 96 MB, one image at a time. Results kept for reuse within an analysis are keyed by hashes with random per-process keys, so a crafted file cannot make two inputs share a result. |
 | Deep nesting (100,000 nested arrays) | lopdf stops at 100 levels. The engine's own walks stop at 16 levels of forms. |
 | Reference cycles (a page tree, form, bookmark, form field or name tree containing itself) | Every walk tracks what it has visited, and the walks added in 0.7.0 also stop at a million nodes. |
 | Lying font tables (offsets past the end, absurd glyph counts) | Every read is bounds-checked; a font that does not add up is left whole. |
@@ -72,7 +73,7 @@ A legitimate 46 MB file with 500,000 objects takes 2 GB and 9 seconds.
 - `examples/fuzz.rs` damages seed PDFs at random and runs the whole analysis on each, on a
   1 MB stack under a 3 GB memory cap, recording panics, hangs and crashes. It runs on stable
   Rust. For 0.6.0: 200,000 inputs from the qpdf seeds, uncompressed with `mutool clean -d`,
-  with no finding. For 0.7.0: 200,000 inputs from 1,250 seeds, with no finding.
+  with no finding. For 0.7.0: 200,000 inputs from 1,250 seeds, with no finding. For 0.10.0: 50,000 more, with no finding.
 - `.github/workflows/audit.yml` checks every dependency against the RustSec advisory database
   on every push and weekly. CI also runs the hostile tests with the Flate decoder the app ships.
 

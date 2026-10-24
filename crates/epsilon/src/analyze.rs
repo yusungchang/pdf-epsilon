@@ -318,6 +318,8 @@ pub fn analyze_bytes_with_progress(input: &[u8], progress: &(dyn Fn(f32) + Sync)
     let doc = crate::load(input)?;
     let tracker = Tracker { parts: Default::default(), report: progress };
     tracker.set(0, 0.0);
+    // The presets that change images decode the same ones: once, for all of them.
+    let share = crate::images::Share::new(Preset::ALL.iter().filter(|p| p.options().images.is_some()).count());
 
     // Large documents run the presets one after another: each copy of a document costs a few
     // kilobytes per object and holds every stream, and five at once is too much for files with
@@ -327,7 +329,7 @@ pub fn analyze_bytes_with_progress(input: &[u8], progress: &(dyn Fn(f32) + Sync)
         let runs: Vec<Result<Run>> = Preset::ALL
             .iter()
             .enumerate()
-            .map(|(i, p)| crate::optimize(input, doc.clone(), &p.options(), &|f| tracker.set(i + 1, f)))
+            .map(|(i, p)| crate::optimize(input, doc.clone(), &p.options(), Some(&share), &|f| tracker.set(i + 1, f)))
             .collect();
         a.apply_runs(&runs);
         let mut analysis = a.finish();
@@ -344,8 +346,9 @@ pub fn analyze_bytes_with_progress(input: &[u8], progress: &(dyn Fn(f32) + Sync)
             .enumerate()
             .map(|(i, p)| {
                 let copy = doc.clone();
+                let share = &share;
                 s.spawn(move || {
-                    let run = crate::optimize(input, copy, &p.options(), &|f| tracker.set(i + 1, f));
+                    let run = crate::optimize(input, copy, &p.options(), Some(share), &|f| tracker.set(i + 1, f));
                     tracker.set(i + 1, 1.0);
                     run
                 })

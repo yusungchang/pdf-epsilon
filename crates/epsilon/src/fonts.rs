@@ -181,10 +181,16 @@ fn checksum(data: &[u8]) -> u32 {
     })
 }
 
+/// Fonts compressed at the highest level, shared between the runs of an analysis, which
+/// compress the same fonts with the same result (see `memo.rs`).
+static DEFLATED: crate::memo::Memo<Vec<u8>> = crate::memo::Memo::new(64 << 20, 0);
+
 pub(crate) fn deflate(data: &[u8]) -> Option<Vec<u8>> {
-    let mut enc = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::best());
-    enc.write_all(data).ok()?;
-    enc.finish().ok()
+    DEFLATED.get_or(crate::memo::key(&[b"deflate-best", data]), Vec::len, || {
+        let mut enc = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::best());
+        enc.write_all(data).ok()?;
+        enc.finish().ok()
+    })
 }
 
 #[cfg(test)]

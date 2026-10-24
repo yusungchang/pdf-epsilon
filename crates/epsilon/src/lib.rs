@@ -26,9 +26,11 @@ mod dedup;
 mod fonts;
 mod images;
 mod limits;
+mod memo;
 mod placement;
 mod revisions;
 mod subset;
+mod system;
 mod verify;
 
 use std::path::Path;
@@ -231,7 +233,7 @@ pub fn compress_bytes(input: &[u8], options: &Options) -> Result<(Vec<u8>, Repor
 /// Like [`compress_bytes`], reporting progress from 0 to 1 as it goes.
 pub fn compress_bytes_with_progress(input: &[u8], options: &Options, progress: &dyn Fn(f32)) -> Result<(Vec<u8>, Report)> {
     let doc = load(input)?;
-    let run = optimize(input, doc, options, progress)?;
+    let run = optimize(input, doc, options, None, progress)?;
     progress(1.0);
     Ok((run.bytes, run.report))
 }
@@ -283,7 +285,8 @@ struct Run {
 }
 
 /// Runs the pipeline. `progress` gets the share done, from 0 to 1; images take most of it.
-fn optimize(input: &[u8], mut doc: Document, options: &Options, progress: &dyn Fn(f32)) -> Result<Run> {
+/// `share` is what the presets of one analysis share (see `images::Share`); `None` for a save.
+fn optimize(input: &[u8], mut doc: Document, options: &Options, share: Option<&images::Share>, progress: &dyn Fn(f32)) -> Result<Run> {
     // lopdf reads leniently; a copy written from what it could not read correctly would change
     // the document without saying so.
     let lost = damage(input, &doc);
@@ -308,7 +311,7 @@ fn optimize(input: &[u8], mut doc: Document, options: &Options, progress: &dyn F
             let s = sizes.entry(id).or_insert(fallback);
             *s = (s.0.max(fallback.0), s.1.max(fallback.1));
         }
-        let stats = images::recompress(&mut doc, policy, &sizes, fallback, &|f| progress(0.05 + 0.75 * f));
+        let stats = images::recompress(&mut doc, policy, &sizes, fallback, share, &|f| progress(0.05 + 0.75 * f));
         report.images_seen = stats.seen;
         report.images_downsampled = stats.downsampled;
         report.images_reencoded = stats.reencoded;

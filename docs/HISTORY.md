@@ -16,8 +16,96 @@
 | 0.8.0 | 2026-10-24 | Desktop shell: renderer memory really capped and quiet, two at a time and cancellable; saving never writes an outdated copy; clear save errors; safe writing. |
 | 0.9.0 | 2026-10-24 | Save all, Open With and Dock drops, Cancel and save progress, and the interface fixes from the 1.0 review. |
 | 0.9.1 | 2026-10-24 | Comparison of cloud files fixed; preset names as tags; version shown; Korean labels; full regression against 0.6.0. |
+| 0.10.0 | 2026-10-24 | Faster: images on every core, a SIMD resizer, shared work in analyses, a lookup table in the operation count; memory sized to the computer. Analysis 1.8×, saving 2.0× against 0.9.0. |
 | 0.5.0 | 2026-10-21 | 0.4.1 released as a minor version at the owner's request; first-launch steps shown on every download; security review. |
 | 0.4.1 | 2026-10-21 | Long file names truncate on every WebKit, a round handle on the comparison divider, glass-finish icon, a product page on GitHub Pages, findings and pages folded under Advanced. |
+
+## 0.10.0, 24 October 2026
+
+The owner asked whether the app could be made radically faster. Profiling came first: macOS `sample`
+on a build with symbols, repeating an analysis or a save so the sampler could attach.
+
+**What the profile showed:**
+- An analysis of the slide deck kept only about 1.4 of 11 cores busy, because each preset worked on
+  its images one at a time.
+- In the busy time, resizing images was 58% of the work, JPEG decoding 17% and JPEG encoding 10%.
+- On the survey, 28% of a save went to Flate compression at the highest level: font programs after
+  their tables are stripped, lossless images, and lopdf's writer.
+- On the 801-page handbook, 41% of a save went to a byte search inside the operation count.
+
+**Changes:**
+
+1. **Images on every core (`images::recompress`).** Images do not depend on each other's results, so
+   they are worked on in parallel and applied in their original order: the output is byte-for-byte the
+   same as one at a time. Cancelling stops the workers after their current image.
+2. **Memory sized to the computer.** A budget shared by every run in the process limits the images
+   worked on at once:
+   - an eighth of installed memory, at most 768 MB, and at most a quarter of what is free;
+   - below 96 MB it is zero, which means one image at a time;
+   - each image counts at its real size (one byte per pixel for grey, three for colour, doubled for
+     the resized copy and the result);
+   - one image alone always runs.
+
+   Installed and free memory come from `hw.memsize` and the host's memory statistics on macOS,
+   `/proc/meminfo` on Linux, and `GlobalMemoryStatusEx` on Windows (`system.rs`). A test pretends a
+   machine with 300 MB free and confirms that never more than one image is in work, and that with
+   memory to spare several are.
+3. **A SIMD resizer.** `fast_image_resize` (pure Rust) with the same Lanczos3 filter as before, about
+   four times faster: 38 ms → 9 ms for a 2480 × 1754 photo halved. Pictures differ from 0.9.1 by at most
+   0.64/255 on the worst page of the real test files, and sizes by ±0.25%.
+4. **Shared work in an analysis (`memo.rs`).**
+   - Each image is decoded once for the three presets that change images, and dropped as soon as the
+     last has it. Fonts compressed at the highest level are remembered (64 MB at most).
+   - A save keeps nothing.
+   - Keys are two hashes, with random keys per process, plus the length; image keys also hold the
+     dictionary entries decoding reads and the resolved colour space.
+   - Outputs are byte-for-byte the same.
+5. **The operation count uses a table (`limits::operations_ok`).** It runs over every content stream
+   several times per save, and searched the delimiter list for every byte. Saving the handbook in a
+   loop: 0.93 s → 0.57 s.
+
+**Results** (wall-clock, median of 7 alternating runs, against 0.9.0 built from its tag):
+
+| File | Analysis | Save (Balanced) |
+|---|---|---|
+| Slides | 0.50 → 0.14 s (3.7×) | 0.40 → 0.07 s (5.4×) |
+| Poster | 0.23 → 0.11 s | 0.38 → 0.05 s |
+| Big data migration | 0.34 → 0.11 s | 0.22 → 0.06 s |
+| Music genre paper | 0.25 → 0.09 s | 0.13 → 0.06 s |
+| Survey | 0.67 → 0.45 s | 0.57 → 0.29 s |
+| Handbook (801 pages, text) | about the same | about the same |
+| **All eight** | **2.62 → 1.47 s (1.8×)** | **2.10 → 1.04 s (2.0×)** |
+
+- CPU time fell 7–9%.
+- The 286 MB file with three 33-megapixel photos: analysis 6.2 → 3.0 s, save 2.2 → 1.3 s.
+- Its peak memory rose (save 0.85 → 1.3 GB on a 36 GB Mac), because its three photos now fit the budget
+  together. On a machine with little free memory, the budget makes them go one at a time.
+- Text-only files gain little: their time is in reading and writing the PDF itself.
+
+**Checks.**
+- *Tests:* all engine and shell tests pass, with new ones for the memo (results worked out once,
+  shared between threads, dropped when everyone has them, within the cap), the memory budget, and one
+  image at a time with little free memory.
+- *Real test files:* after each step except the resizer, all 32 outputs and 8 analyses are
+  byte-for-byte unchanged. After the resizer, 14 outputs changed, every page was compared as a picture
+  (0.64/255 worst), text is identical in all 32, and preset sizes in the analyses moved by at most
+  0.25% with the same findings and byte breakdown.
+- *qpdf corpus (708 files, against 0.9.1):*
+  - no crash or hang;
+  - 700 outputs identical, and 8 differ by under 0.3% in size, at most 0.4/255 in pictures (every page
+    compared);
+  - text as before;
+  - saving the corpus takes 9.3 s → 4.6 s.
+- *Hostile corpus:* the same outcomes, with peak memory within run-to-run variation (five runs each).
+- *Fuzzing:* 50,000 inputs, no panic, hang or crash, 357 MB at most.
+- `npm run build` produces the app.
+
+**Minor release routine.**
+- *Security review:* no new parsing. The new code is threads over already-bounded work, a memo keyed by
+  hashes the input cannot steer, and reading memory figures from the system.
+- *Dependencies:* `fast_image_resize` resizes buffers the engine has decoded itself, and uses
+  `unsafe` SIMD, so it is now covered by the hostile tests and the fuzzing; `libc` is used on macOS and
+  `windows-sys` on Windows for the memory figures.
 
 ## 0.9.1, 24 October 2026
 

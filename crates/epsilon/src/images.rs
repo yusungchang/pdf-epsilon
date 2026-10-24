@@ -114,11 +114,16 @@ impl Context {
 
 /// Recompresses every image the policy can improve. `progress` gets the share of images
 /// done, from 0 to 1.
+///
+/// Images are independent of each other, so they are worked on in parallel, then applied in
+/// their original order: the result is the same as one at a time. How many decoded images may be
+/// in memory at once is limited across every run in the process (see `Budget`).
 pub fn recompress(
     doc: &mut Document,
     policy: &ImagePolicy,
     sizes: &HashMap<ObjectId, Size>,
     fallback: Size,
+    share: Option<&Share>,
     progress: &dyn Fn(f32),
 ) -> Stats {
     let mut stats = Stats::default();
@@ -127,12 +132,21 @@ pub fn recompress(
     let ctx = context(doc, &ids);
 
     let total = ids.len().max(1) as f32;
-    for (i, id) in ids.into_iter().enumerate() {
-        progress(i as f32 / total);
+    progress(0.0);
+    let limit = image_memory();
+    let results = in_parallel(doc, &ids, &|doc, id| {
         let job = ctx.job(id, sizes, fallback);
-        let Ok(Object::Stream(stream)) = doc.get_object(id) else { continue };
-        let before = stream.content.len();
-        let Some(done) = process(doc, stream, policy, job) else { continue };
+        let Ok(Object::Stream(stream)) = doc.get_object(id) else { return None };
+        let _memory = BUDGET.take(decoded_bytes(doc, &stream.dict, job.is_soft_mask), limit);
+        process(doc, stream, policy, job, share)
+    }, &|done| progress(done as f32 / total));
+
+    for (id, done) in ids.into_iter().zip(results) {
+        let Some(done) = done else { continue };
+        let before = match doc.get_object(id) {
+            Ok(Object::Stream(s)) => s.content.len(),
+            _ => continue,
+        };
         if done.downsampled {
             stats.downsampled += 1;
         }
@@ -153,6 +167,127 @@ pub fn recompress(
     stats
 }
 
+/// Runs `work` on every id across the machine's cores, returning the results in the order of
+/// `ids`. `done` is called on this thread with the number finished so far. If it panics (a
+/// cancellation, see `crate::Cancelled`), the workers stop after their current image and the
+/// panic goes on.
+fn in_parallel<T: Send>(
+    doc: &Document,
+    ids: &[ObjectId],
+    work: &(dyn Fn(&Document, ObjectId) -> Option<T> + Sync),
+    done: &dyn Fn(usize),
+) -> Vec<Option<T>> {
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    let workers = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1).min(ids.len()).max(1);
+    let next = AtomicUsize::new(0);
+    let stop = AtomicBool::new(false);
+    let mut results: Vec<Option<T>> = (0..ids.len()).map(|_| None).collect();
+    let mut stopped = None;
+    std::thread::scope(|scope| {
+        let (tx, rx) = std::sync::mpsc::channel::<(usize, Option<T>)>();
+        for _ in 0..workers {
+            let tx = tx.clone();
+            let (next, stop) = (&next, &stop);
+            scope.spawn(move || loop {
+                let i = next.fetch_add(1, Ordering::Relaxed);
+                if i >= ids.len() || stop.load(Ordering::Relaxed) {
+                    break;
+                }
+                if tx.send((i, work(doc, ids[i]))).is_err() {
+                    break;
+                }
+            });
+        }
+        drop(tx);
+        let mut finished = 0;
+        for (i, r) in rx {
+            results[i] = r;
+            finished += 1;
+            if let Err(p) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| done(finished))) {
+                stop.store(true, Ordering::Relaxed);
+                stopped = Some(p);
+                break;
+            }
+        }
+    });
+    if let Some(p) = stopped {
+        std::panic::resume_unwind(p);
+    }
+    results
+}
+
+/// How much memory working on an image takes: its decoded pixels (one byte per pixel for grey,
+/// three for colour), plus as much again for a resized copy and the encoded result.
+fn decoded_bytes(doc: &Document, dict: &Dictionary, is_soft_mask: bool) -> u64 {
+    let w = int(doc, dict, b"Width").unwrap_or(0).clamp(0, 1 << 20) as u64;
+    let h = int(doc, dict, b"Height").unwrap_or(0).clamp(0, 1 << 20) as u64;
+    let channels = colour_space(doc, dict, is_soft_mask).map(|s| s.channels() as u64).unwrap_or(3);
+    (w * h * channels).saturating_mul(2).min(crate::limits::IMAGE_PIXELS * 6)
+}
+
+/// At most this much memory for images worked on at once, on any computer.
+const IMAGE_MEMORY: u64 = 768 << 20;
+
+/// Memory for images worked on at once, sized to this computer: an eighth of installed memory,
+/// at most `IMAGE_MEMORY`, and at most a quarter of what is free now. Below 96 MB it is zero:
+/// one image at a time, as before 0.10.0. Unknown installed memory counts as 2 GB.
+pub(crate) fn image_memory() -> u64 {
+    budget_for(crate::system::memory())
+}
+
+fn budget_for((total, available): (u64, u64)) -> u64 {
+    let mut limit = if total > 0 { (total / 8).min(IMAGE_MEMORY) } else { 256 << 20 };
+    if available > 0 {
+        limit = limit.min(available / 4);
+    }
+    if limit < 96 << 20 { 0 } else { limit }
+}
+
+/// Memory for decoded images, shared by every run in the process (an analysis runs four
+/// presets at once). An image waits until its share fits within the run's limit; one alone always
+/// may run, so a single large image is no slower than before. Before 0.10.0 each run worked on
+/// one image at a time.
+struct Budget {
+    used: std::sync::Mutex<u64>,
+    freed: std::sync::Condvar,
+}
+
+static BUDGET: Budget = Budget { used: std::sync::Mutex::new(0), freed: std::sync::Condvar::new() };
+
+struct Taken(u64);
+
+impl Budget {
+    fn take(&'static self, bytes: u64, limit: u64) -> Taken {
+        let mut used = self.used.lock().unwrap_or_else(|e| e.into_inner());
+        while *used > 0 && *used + bytes > limit {
+            used = self.freed.wait(used).unwrap_or_else(|e| e.into_inner());
+        }
+        *used += bytes;
+        #[cfg(test)]
+        {
+            let now = AT_ONCE.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+            MOST_AT_ONCE.fetch_max(now, std::sync::atomic::Ordering::SeqCst);
+        }
+        Taken(bytes)
+    }
+}
+
+/// Images being worked on now, and the most at once: tests check the budget with these.
+#[cfg(test)]
+static AT_ONCE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+#[cfg(test)]
+static MOST_AT_ONCE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+impl Drop for Taken {
+    fn drop(&mut self) {
+        #[cfg(test)]
+        AT_ONCE.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+        let mut used = BUDGET.used.lock().unwrap_or_else(|e| e.into_inner());
+        *used -= self.0;
+        BUDGET.freed.notify_all();
+    }
+}
+
 struct Job {
     drawn: Size,
     is_soft_mask: bool,
@@ -163,6 +298,44 @@ struct Done {
     stream: Stream,
     downsampled: bool,
     reencoded: bool,
+}
+
+/// What the runs of one analysis share: each image decoded once for all the presets that change
+/// images, and dropped as soon as the last of them has it (see `memo.rs`). Saving a single copy
+/// shares nothing and keeps nothing.
+pub struct Share {
+    decoded: crate::memo::Memo<std::sync::Arc<(DynamicImage, bool)>>,
+}
+
+impl Share {
+    /// For `runs` runs that each decode the document's images.
+    pub fn new(runs: usize) -> Share {
+        Share { decoded: crate::memo::Memo::new(image_memory() as usize, runs) }
+    }
+}
+
+/// `decode_pixels`, worked out once for the same image across the presets of an analysis. The
+/// key holds everything decoding depends on: the stream's bytes and the dictionary entries it
+/// reads, with the colour space as resolved in this document.
+fn decoded_pixels(doc: &Document, stream: &Stream, is_soft_mask: bool, share: Option<&Share>) -> Option<std::sync::Arc<(DynamicImage, bool)>> {
+    let Some(share) = share else { return decode_pixels(doc, stream, is_soft_mask).map(std::sync::Arc::new) };
+    let dict = &stream.dict;
+    if unsupported(doc, dict, is_soft_mask).is_some() {
+        return None;
+    }
+    let space = colour_space(doc, dict, is_soft_mask)?;
+    let entries = format!(
+        "{:?}|{:?}|{:?}|{:?}|{:?}|{}|{}",
+        int(doc, dict, b"Width"),
+        int(doc, dict, b"Height"),
+        int(doc, dict, b"BitsPerComponent"),
+        dict.get(b"Filter").ok(),
+        dict.get(b"DecodeParms").ok(),
+        space.channels(),
+        is_soft_mask
+    );
+    let key = crate::memo::key(&[b"image", entries.as_bytes(), &stream.content]);
+    share.decoded.get_or(key, |d| d.0.as_bytes().len(), || decode_pixels(doc, stream, is_soft_mask).map(std::sync::Arc::new))
 }
 
 /// The pixels of an image this module understands, and whether it was stored as JPEG.
@@ -202,34 +375,37 @@ fn decode_pixels(doc: &Document, stream: &Stream, is_soft_mask: bool) -> Option<
     Some(decoded)
 }
 
-fn process(doc: &Document, stream: &Stream, policy: &ImagePolicy, job: Job) -> Option<Done> {
+fn process(doc: &Document, stream: &Stream, policy: &ImagePolicy, job: Job, share: Option<&Share>) -> Option<Done> {
     let dict = &stream.dict;
     let original_len = stream.content.len();
-    let (pixels, was_jpeg) = decode_pixels(doc, stream, job.is_soft_mask)?;
-    let (width, height) = (pixels.width(), pixels.height());
+    let decoded = decoded_pixels(doc, stream, job.is_soft_mask, share)?;
+    let (original, was_jpeg) = (&decoded.0, decoded.1);
+    let (width, height) = (original.width(), original.height());
 
     // How many pixels does the drawn size actually need?
     let need_w = job.drawn.0 / 72.0 * policy.max_dpi;
     let need_h = job.drawn.1 / 72.0 * policy.max_dpi;
     let scale = (need_w / width as f32).max(need_h / height as f32).min(1.0);
     let downsample = job.may_resize && scale * DOWNSAMPLE_THRESHOLD < 1.0;
-    let pixels = if downsample {
+    let resized;
+    let pixels: &DynamicImage = if downsample {
         let w = ((width as f32 * scale).round() as u32).max(1);
         let h = ((height as f32 * scale).round() as u32).max(1);
-        pixels.resize_exact(w, h, image::imageops::FilterType::Lanczos3)
+        resized = resample(original, w, h);
+        &resized
     } else {
-        pixels
+        original
     };
 
-    let lossy = !job.is_soft_mask && (was_jpeg || looks_photographic(&pixels));
+    let lossy = !job.is_soft_mask && (was_jpeg || looks_photographic(pixels));
     let (content, filter) = if lossy {
-        (jpeg(&pixels, policy.jpeg_quality)?, "DCTDecode")
+        (jpeg(pixels, policy.jpeg_quality)?, "DCTDecode")
     } else {
         (deflate(pixels.as_bytes())?, "FlateDecode")
     };
 
     // Read the new image back as a viewer will, and compare it with the pixels meant.
-    if !reads_back(&content, lossy, &pixels) {
+    if !reads_back(&content, lossy, pixels) {
         return None;
     }
 
@@ -412,6 +588,30 @@ fn reads_back(content: &[u8], lossy: bool, pixels: &DynamicImage) -> bool {
     n > 0 && sum as f64 / n as f64 <= JPEG_MAX_DIFFERENCE
 }
 
+/// The image at a new size, with a Lanczos3 filter. fast_image_resize uses the processor's
+/// vector instructions: about four times faster than the image crate's filter, and within
+/// 0.1 of 255 of it on average. Falls back to the image crate if it refuses.
+fn resample(img: &DynamicImage, w: u32, h: u32) -> DynamicImage {
+    use fast_image_resize::{images::Image, FilterType, PixelType, ResizeAlg, ResizeOptions, Resizer};
+    let (kind, gray) = match img {
+        DynamicImage::ImageLuma8(_) => (PixelType::U8, true),
+        _ => (PixelType::U8x3, false),
+    };
+    let fast = || -> Option<DynamicImage> {
+        let src = Image::from_vec_u8(img.width(), img.height(), img.as_bytes().to_vec(), kind).ok()?;
+        let mut dst = Image::new(w, h, kind);
+        let options = ResizeOptions::new().resize_alg(ResizeAlg::Convolution(FilterType::Lanczos3));
+        Resizer::new().resize(&src, &mut dst, &options).ok()?;
+        let out = dst.into_vec();
+        if gray {
+            GrayImage::from_raw(w, h, out).map(DynamicImage::ImageLuma8)
+        } else {
+            RgbImage::from_raw(w, h, out).map(DynamicImage::ImageRgb8)
+        }
+    };
+    fast().unwrap_or_else(|| img.resize_exact(w, h, image::imageops::FilterType::Lanczos3))
+}
+
 /// Counts distinct colours on a sample. Screenshots, charts and line art have few;
 /// JPEG would put ringing round their edges, so they stay lossless.
 fn looks_photographic(img: &DynamicImage) -> bool {
@@ -499,6 +699,66 @@ mod tests {
 
     fn gradient(w: u32, h: u32, shift: u32) -> DynamicImage {
         DynamicImage::ImageRgb8(RgbImage::from_fn(w, h, |x, y| image::Rgb([(x * 2 + shift) as u8, (y * 2) as u8, ((x + y + shift) / 2) as u8])))
+    }
+
+    /// A document with `n` photo-like 800 × 600 images, each drawn at full page size.
+    fn photos(n: usize) -> Document {
+        let mut doc = Document::with_version("1.7");
+        let pages = doc.new_object_id();
+        let mut xobjects = Dictionary::new();
+        let mut content = String::new();
+        for i in 0..n {
+            let px = gradient(800, 600, i as u32 * 7);
+            let mut z = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::fast());
+            z.write_all(px.as_bytes()).unwrap();
+            let mut s = Stream::new(
+                lopdf::dictionary! { "Type" => "XObject", "Subtype" => "Image", "Width" => 800, "Height" => 600, "ColorSpace" => "DeviceRGB", "BitsPerComponent" => 8, "Filter" => "FlateDecode" },
+                z.finish().unwrap(),
+            );
+            s.allows_compression = false;
+            xobjects.set(format!("I{i}"), doc.add_object(s));
+            content.push_str(&format!("q 40 0 0 30 0 0 cm /I{i} Do Q "));
+        }
+        let c = doc.add_object(Stream::new(Dictionary::new(), content.into_bytes()));
+        let page = doc.add_object(lopdf::dictionary! { "Type" => "Page", "Parent" => pages, "Contents" => c, "Resources" => lopdf::dictionary! { "XObject" => xobjects } });
+        doc.objects.insert(pages, Object::Dictionary(lopdf::dictionary! { "Type" => "Pages", "Kids" => vec![page.into()], "Count" => 1 }));
+        doc
+    }
+
+    // One test for both, since they share the pretend machine and the counters.
+    #[test]
+    fn little_free_memory_means_one_image_at_a_time() {
+        let policy = ImagePolicy { max_dpi: 150.0, jpeg_quality: 75 };
+        let run = |total: u64, free: u64| {
+            *crate::system::PRETEND.lock().unwrap() = Some((total, free));
+            MOST_AT_ONCE.store(0, std::sync::atomic::Ordering::SeqCst);
+            let mut doc = photos(12);
+            let stats = recompress(&mut doc, &policy, &HashMap::new(), (40.0, 30.0), None, &|_| {});
+            assert_eq!(stats.seen, 12);
+            MOST_AT_ONCE.load(std::sync::atomic::Ordering::SeqCst)
+        };
+        const GB: u64 = 1 << 30;
+        let short = run(16 * GB, 300 << 20);
+        let plenty = run(36 * GB, 20 * GB);
+        *crate::system::PRETEND.lock().unwrap() = None;
+        assert_eq!(short, 1, "with 300 MB free, images must go one at a time");
+        if std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1) > 1 {
+            assert!(plenty > 1, "with memory to spare, images should be worked on together");
+        }
+    }
+
+    #[test]
+    fn image_memory_follows_the_computer() {
+        const GB: u64 = 1 << 30;
+        assert_eq!(budget_for((16 * GB, 8 * GB)), IMAGE_MEMORY);
+        assert_eq!(budget_for((4 * GB, 3 * GB)), GB / 2);
+        // Little free now: a quarter of what is free.
+        assert_eq!(budget_for((16 * GB, GB)), GB / 4);
+        // Very little: one image at a time.
+        assert_eq!(budget_for((16 * GB, 300 << 20)), 0);
+        assert_eq!(budget_for((512 << 20, 0)), 0);
+        // Unknown: a cautious 256 MB.
+        assert_eq!(budget_for((0, 0)), 256 << 20);
     }
 
     #[test]

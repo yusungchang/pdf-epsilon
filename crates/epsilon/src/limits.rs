@@ -120,7 +120,19 @@ pub fn page_content(doc: &Document, page_id: ObjectId) -> Option<Vec<u8>> {
 /// start with a letter, which includes every operator (and some names and text, so it errs
 /// on the side of refusing).
 pub fn operations_ok(content: &[u8]) -> bool {
-    let regular = |b: u8| !b" \t\r\n\x0c\0()<>[]{}/%".contains(&b);
+    // A table, not a search of the delimiter list for every byte: this runs over every content
+    // stream several times per save, and the search was 41% of saving an 801-page book.
+    const REGULAR: [bool; 256] = {
+        let mut t = [true; 256];
+        let delimiters = b" \t\r\n\x0c\0()<>[]{}/%";
+        let mut i = 0;
+        while i < delimiters.len() {
+            t[delimiters[i] as usize] = false;
+            i += 1;
+        }
+        t
+    };
+    let regular = |b: u8| REGULAR[b as usize];
     let mut tokens = 0usize;
     let mut previous = b' ';
     for &b in content {
