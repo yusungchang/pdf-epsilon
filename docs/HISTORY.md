@@ -17,8 +17,36 @@
 | 0.9.0 | 2026-10-24 | Save all, Open With and Dock drops, Cancel and save progress, and the interface fixes from the 1.0 review. |
 | 0.9.1 | 2026-10-24 | Comparison of cloud files fixed; preset names as tags; version shown; Korean labels; full regression against 0.6.0. |
 | 0.10.0 | 2026-10-24 | Faster: images on every core, a SIMD resizer, shared work in analyses, a lookup table in the operation count; memory sized to the computer. Analysis 1.8×, saving 2.0× against 0.9.0. |
+| 0.10.1 | 2026-10-24 | Comparison pictures no longer lost when they arrive after the reply (the cause of "could not be rendered", worst at 2× and 4×). |
 | 0.5.0 | 2026-10-21 | 0.4.1 released as a minor version at the owner's request; first-launch steps shown on every download; security review. |
 | 0.4.1 | 2026-10-21 | Long file names truncate on every WebKit, a round handle on the comparison divider, glass-finish icon, a product page on GitHub Pages, findings and pages folded under Advanced. |
+
+## 0.10.1, 24 October 2026
+
+**Comparison said "This page could not be rendered", worst at 2× and 4×.**
+
+- *Reported:* with 0.10.0 installed from GitHub, Fit only sometimes showed the pages, and 2× and 4×
+  always failed. The renderer itself was fine: run by hand, the installed copy drew a page 4,096 pixels
+  wide in 1.25 s.
+- *Found:* Tauri delivers a channel message over 8 KB (`MAX_JSON_DIRECT_EXECUTE_THRESHOLD` in
+  `tauri/src/ipc/channel.rs`) by telling the window to fetch it with a second request. So a rendered
+  page, always far larger, can reach the window after the reply to its `render` command.
+  - Since 0.8.0 the window took a reply without a picture to mean the page could not be drawn, so a
+    picture that came later was lost.
+  - Bigger pictures take longer to fetch, which is why 2× and 4× nearly always failed and Fit only
+    sometimes.
+  - Every logging build used to investigate wrote to a file between sending the picture and replying,
+    which gave the picture time to arrive. So every one of them worked, and the failure was blamed on
+    other causes for a while (cloud files, interference from test runs, the downloaded copy).
+- *Fix (`ui/app.js`):*
+  - A finished request has always sent one message per page, an empty one for a page that could not be
+    drawn, so the window now waits for it. Only a cancelled request ends without a picture.
+  - A picture that never comes counts as failed after 15 seconds, instead of leaving "Rendering…".
+  - Thumbnails get the same grace before a page is marked as not drawn.
+- *Tested:* the screenshot harness's mock now delivers pictures 300 ms after the reply, as Tauri does
+  with large messages. Before the fix, the comparison failed at Fit and at 4×; after it, both pages
+  show at both. Thumbnails load the same with late delivery as without (15–16 drawn, none blank). All
+  102 screens ran without error.
 
 ## 0.10.0, 24 October 2026
 

@@ -723,6 +723,12 @@ async function fetchThumbs(f) {
   try {
     finished = (await invoke("render", { path: f.path, options: null, pages, width: THUMB_WIDTH, kind: "thumbnails", each })) !== false;
   } catch { /* thumbnails are optional */ }
+  // Pictures can arrive after the reply (see renderPage): give the rest time before marking any
+  // page as one that could not be drawn.
+  if (finished) {
+    const until = Date.now() + LATE_PICTURE_MS;
+    while (pages.some((p) => f.thumbs.get(p) === undefined) && Date.now() < until) await new Promise((r) => setTimeout(r, 100));
+  }
   f.thumbsBusy = false;
   for (const p of pages) {
     if (f.thumbs.get(p) !== undefined) continue;
@@ -911,6 +917,9 @@ function settingsLabel() {
   return state.custom ? t("compare.custom") : presetName(state.preset);
 }
 
+// How long a picture may take to arrive after its request has finished (see renderPage).
+const LATE_PICTURE_MS = 15000;
+
 // A page as a PNG data URL, null when it could not be drawn, or "tooLarge" for a file too
 // large to draw. Each side keeps only its newest request: turning pages quickly cancels the
 // pages left behind. Only drawn pages are remembered, so a failure is tried again next time.
@@ -922,7 +931,13 @@ function renderPage(f, compressed, page, width) {
       const each = new Channel();
       each.onmessage = ({ png }) => resolve(png ? `data:image/png;base64,${png}` : null);
       invoke("render", { path: f.path, options: compressed ? state.options : null, pages: [page], width, kind: compressed ? "compare-after" : "compare-before", each })
-        .then(() => resolve(null), (e) => resolve(e && e.code === "tooLargeToShow" ? "tooLarge" : null));
+        .then(
+          // A finished request has sent its page, but Tauri delivers a message over 8 KB with a
+          // second request, so the picture can arrive after this reply: wait for it (a page that
+          // could not be drawn arrives too, as empty). Only a cancelled request sends nothing.
+          (finished) => (finished === false ? resolve(null) : setTimeout(() => resolve(null), LATE_PICTURE_MS)),
+          (e) => resolve(e && e.code === "tooLargeToShow" ? "tooLarge" : null),
+        );
     });
     f.renders.set(key, drawing);
     drawing.then((src) => { if (!src || src === "tooLarge") f.renders.delete(key); });
