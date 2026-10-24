@@ -1130,7 +1130,7 @@ dependencies = [
 
 [[package]]
 name = "epsilon"
-version = "0.10.1"
+version = "0.11.0"
 dependencies = [
  "fast_image_resize",
  "flate2",
@@ -2957,7 +2957,7 @@ dependencies = [
 
 [[package]]
 name = "pdf-epsilon"
-version = "0.10.1"
+version = "0.11.0"
 dependencies = [
  "epsilon",
  "flate2",

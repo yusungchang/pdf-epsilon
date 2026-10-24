@@ -17,11 +17,21 @@
 | 0.9.0 | 2026-10-24 | Save all, Open With and Dock drops, Cancel and save progress, and the interface fixes from the 1.0 review. |
 | 0.9.1 | 2026-10-24 | Comparison of cloud files fixed; preset names as tags; version shown; Korean labels; full regression against 0.6.0. |
 | 0.10.0 | 2026-10-24 | Faster: images on every core, a SIMD resizer, shared work in analyses, a lookup table in the operation count; memory sized to the computer. Analysis 1.8×, saving 2.0× against 0.9.0. |
-| 0.10.1 | 2026-10-24 | Comparison pictures no longer lost when they arrive after the reply (the cause of "could not be rendered", worst at 2× and 4×). "Details" starts closed; no focus ring on the comparison's close button when it opens. |
+| 0.11.0 | 2026-10-25 | Released as a minor version at the owner's request (built locally as 0.10.1). Comparison pictures no longer lost when they arrive after the reply (the cause of "could not be rendered", worst at 2× and 4×). "Details" starts closed; no focus ring on the comparison's close button when it opens. |
 | 0.5.0 | 2026-10-21 | 0.4.1 released as a minor version at the owner's request; first-launch steps shown on every download; security review. |
 | 0.4.1 | 2026-10-21 | Long file names truncate on every WebKit, a round handle on the comparison divider, glass-finish icon, a product page on GitHub Pages, findings and pages folded under Advanced. |
 
-## 0.10.1, 24 October 2026
+## 0.11.0, 25 October 2026
+
+Released at the owner's request so the comparison fix can be downloaded; built and tested locally as
+0.10.1, which was never released.
+
+**Minor release check.** Since 0.10.0 only the window code changed (`ui/app.js`, `ui/index.html`,
+`ui/style.css`); no parsing path, decoder or limit changed, so there was nothing new to review against
+`docs/SECURITY.md` and no new hostile case. The full test suite, including `tests/hostile.rs`, was run
+again: `cargo test --workspace --release` passed 56 of 56 (engine 24, fonts 2, hostile 2 covering every case,
+locales 3, regressions 7, roundtrip 9, shell 8, renderer 1).
+
 
 **Comparison said "This page could not be rendered", worst at 2× and 4×.**
 
