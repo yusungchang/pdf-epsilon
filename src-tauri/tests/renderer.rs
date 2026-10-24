@@ -78,10 +78,16 @@ fn draws_a_page_and_ends_quietly_when_a_page_needs_too_much_memory() {
     assert_eq!(code, Some(0));
     assert!(frames.len() == 1 && frames[0] > 0, "{frames:?}");
 
-    // Six such images reached 2.6 GB in 0.7.0. Now the renderer ends itself (code 3 from its
-    // watchdog, 4 from its allocator), well before using that much.
+    // Six such images reached 2.6 GB on macOS in 0.7.0, whose allocator keeps memory the
+    // renderer has freed. There the renderer now ends itself (code 3 from its watchdog, 4 from
+    // its allocator) well before that. Linux and Windows give the memory back and draw the page
+    // within the limits. Either way it ends quickly, with an exit code, never a crash.
     let (code, frames, took) = render(&pdf(&dir, "heavy.pdf", 6));
-    assert!(matches!(code, Some(3) | Some(4)), "ended with {code:?}, sent {frames:?}");
+    if cfg!(target_os = "macos") {
+        assert!(matches!(code, Some(3) | Some(4)), "ended with {code:?}, sent {frames:?}");
+    } else {
+        assert!(matches!(code, Some(0) | Some(3) | Some(4)), "ended with {code:?}, sent {frames:?}");
+    }
     assert!(took < Duration::from_secs(30), "{took:?}");
     std::fs::remove_dir_all(&dir).unwrap();
 }
