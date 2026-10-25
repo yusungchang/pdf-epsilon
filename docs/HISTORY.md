@@ -54,7 +54,8 @@ so 1.0.0 waits for certificates. A release candidate first.
   `Cargo.toml` and `tauri.conf.json`, and the README now use https://yusungchang.com/pdf-epsilon instead of
   the github.io address and the unregistered pdfepsilon.com. The update check still asks `api.github.com`.
   Kept at 1.0.0 rather than 1.0.1, since 1.0.0 is not released and its tag must stay `v1.0.0`.
-  On the day the address returned 404 and yusungchang.com's certificate had expired (7 January 2026).
+  At first the address returned 404 behind an expired certificate; later that day the owner set up the
+  forward (301 to the github.io site) and a new certificate (SSL.com, valid to 11 May 2027).
 - *Docs:* `SIGNING.md` (what to buy, which secrets, what changes in CI); `RELEASE-1.0.md` marked up
   with where each item stands; `HANDOVER.md` brought up to date.
 

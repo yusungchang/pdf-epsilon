@@ -34,7 +34,7 @@ The code is public at https://github.com/yusungchang/pdf-epsilon, branch `main`.
 | Languages (`ui/locales`) | English and Korean. Every string is in the locale files; tests check they match. The owner audited every string in context in 0.6.1 (see HISTORY). |
 | CI and releases (`.github/workflows/build.yml`) | Builds installers for all three platforms on every push to `main` and on `v*` tags. Tags also attach fixed-name copies for the website and verify the Mac signature. v0.4.0 is published (fixed-name copies added by hand); v0.5.0 is the first tag built with the new steps. |
 | Platforms | v0.4.0 tested by the owner on macOS (Intel and Apple silicon), Windows 11 and Linux Mint (`.deb`, VM): all ran. |
-| Website (`site/`, `pages.yml`) | Live at https://yusungchang.github.io/pdf-epsilon/ since 21 October 2026, English and Korean. The public address is https://yusungchang.com/pdf-epsilon, forwarded there (see Known issues). Every download shows the first-launch steps. Bug reports come in as GitHub issues. |
+| Website (`site/`, `pages.yml`) | Live at https://yusungchang.github.io/pdf-epsilon/ since 21 October 2026, English and Korean. The public address is https://yusungchang.com/pdf-epsilon, forwarded there with a 301 (checked 25 October 2026; certificate valid to 11 May 2027). Every download shows the first-launch steps. Bug reports come in as GitHub issues. |
 
 ## Environment on the owner's Mac
 
@@ -126,9 +126,6 @@ truncated PDF both give a clear "not a readable PDF" message.
   An app that says "damaged" has a broken signature; check with `codesign --verify --deep --strict`.
   Windows SmartScreen also warns. Removing the warnings needs an Apple Developer ID with notarization and a
   Windows code-signing certificate.
-- **The website forward is not live yet.** On 25 October 2026 https://yusungchang.com/pdf-epsilon returned 404, and
-  yusungchang.com's TLS certificate (Sectigo) had expired on 7 January 2026, so browsers warn before the page.
-  The app's "Website" menu item, the manifests and the README all use that address.
 
 ## Release routine
 
@@ -139,9 +136,8 @@ so `v0.4.0` is the first release to include it.
 ## Next steps
 
 0. **Release 1.0.0.** The code is ready and versioned 1.0.0 (MIT licence, release checks run; see HISTORY).
-   It waits on three owner steps, then gets the minor-release tag `v1.0.0`:
+   It waits on two owner steps, then gets the minor-release tag `v1.0.0`:
    - buy and set up signing, then wire it into CI as `SIGNING.md` describes;
-   - make https://yusungchang.com/pdf-epsilon forward to the GitHub Pages site, and renew yusungchang.com's certificate;
    - try a release candidate from `main` (CI artifacts) on Windows and Linux.
    `RELEASE-1.0.md` keeps the full list, including the should and later items left for 1.x.
 1. **Owner decisions pending.** Email contact with users (optional, never required) was raised for 0.6.0 and
