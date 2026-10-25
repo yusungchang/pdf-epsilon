@@ -7,7 +7,7 @@ shrinks it on your own computer. Nothing is uploaded anywhere. Drop a PDF on the
 to see where its bytes go, page by page, and what each preset would save. Then save a
 smaller copy, named `<name>-epsilon.pdf`. The original is never changed.
 
-Website and downloads: https://yusungchang.github.io/pdf-epsilon/
+Website and downloads: https://yusungchang.com/pdf-epsilon
 
 ## Analysis
 
@@ -52,7 +52,7 @@ To add a language:
 3. Run `cargo test -p epsilon --release`. It checks that every language has exactly the keys
    and placeholders of English.
 
-Website: <https://pdfepsilon.com> (domain not yet registered).
+Website: <https://yusungchang.com/pdf-epsilon>.
 Source: <https://github.com/yusungchang/pdf-epsilon>.
 
 ## What it does

@@ -15,7 +15,10 @@
       "identifier": "opener:allow-open-url",
       "allow": [
         {
-          "url": "https://yusungchang.github.io/pdf-epsilon/*"
+          "url": "https://yusungchang.com/pdf-epsilon"
+        },
+        {
+          "url": "https://yusungchang.com/pdf-epsilon/*"
         }
       ]
     }

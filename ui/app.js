@@ -1473,7 +1473,7 @@ function renderThemePicker() {
 
 // ---- update check: only when asked, and only the version number goes back and forth ----
 
-const SITE = "https://yusungchang.github.io/pdf-epsilon/";
+const SITE = "https://yusungchang.com/pdf-epsilon";
 const LATEST = "https://api.github.com/repos/yusungchang/pdf-epsilon/releases/latest";
 
 // "v1.2.3" or "1.2.3" to [1, 2, 3]; anything else is not trusted.

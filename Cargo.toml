@@ -7,7 +7,7 @@ version = "1.0.0"
 edition = "2021"
 authors = ["yusungchang"]
 license = "MIT"
-homepage = "https://pdfepsilon.com"
+homepage = "https://yusungchang.com/pdf-epsilon"
 repository = "https://github.com/yusungchang/pdf-epsilon"
 
 [profile.release]

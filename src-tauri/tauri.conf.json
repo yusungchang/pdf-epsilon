@@ -43,7 +43,7 @@
     "copyright": "© 2026 yusungchang",
     "shortDescription": "Make PDFs smaller. Keep what matters.",
     "longDescription": "PDF Epsilon shrinks PDF files on your own computer. It downsamples and re-encodes oversized images, merges duplicates and removes clutter, while keeping text, vector drawing, links, bookmarks and forms intact.",
-    "homepage": "https://pdfepsilon.com",
+    "homepage": "https://yusungchang.com/pdf-epsilon",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

@@ -7,7 +7,7 @@ engine blockers were reproduced twice. Test files and harnesses were kept outsid
 Severity: **blocker** loses content or breaks the app; **should** fix before 1.0; **later** after 1.0.
 
 **Where it stands (25 October 2026, code at 1.0.0, not yet tagged).** Every blocker and every must item is
-done except three that wait on the owner: signed installers (`SIGNING.md`), registering pdfepsilon.com, and
+done except three that wait on the owner: signed installers (`SIGNING.md`), the yusungchang.com/pdf-epsilon forward (the homepage since 25 October 2026), and
 trying the release candidate on Windows and Linux. The tag `v1.0.0` follows those.
 
 ## Blockers
@@ -129,8 +129,9 @@ All three fixed in 0.6.2; see `HISTORY.md` for how each was tested.
 - **Done in 0.9.0: Open With and file associations.** There is no Dock drop, no Finder or Explorer "Open with", and no
   single-instance handling on Windows and Linux.
 - **Done in 1.0.0: MIT licence** (`LICENSE`). Was: `UNLICENSED`, while the repo is public and the website says "Free to use".
-- **The homepage points to pdfepsilon.com, which is unregistered.** Owner's decision (25 October 2026): keep
-  it; the owner registers the domain before the release.
+- **The homepage.** Owner's decision (25 October 2026): https://yusungchang.com/pdf-epsilon, forwarded to the
+  GitHub Pages site, instead of pdfepsilon.com. Done in the app, manifests and README; the forward and an
+  expired certificate on yusungchang.com are the owner's to fix before the release.
 - **A click-through of the real app on all three platforms.** The owner has used the real app on macOS
   through 0.11. Owner's decision: a release candidate from `main` is tried on Windows and Linux before the tag.
 - **Signing.** Owner's decision (25 October 2026): 1.0.0 waits for signed installers. What to buy and

@@ -26,11 +26,12 @@
 ## 1.0.0, 25 October 2026 (prepared; tag waits for signing)
 
 The owner asked for 1.0.0 with "nothing funny". The code is versioned 1.0.0 and checked, but not
-tagged: the owner chose to wait for signed installers, to register pdfepsilon.com, and to try a
+tagged: the owner chose to wait for signed installers, to set up the website address, and to try a
 release candidate (CI artifacts from `main`) on Windows and Linux first. See `RELEASE-1.0.md` and
 `SIGNING.md`.
 
-**Owner's decisions.** MIT licence. Keep pdfepsilon.com as the homepage and register it. Ship signed,
+**Owner's decisions.** MIT licence. The homepage is https://yusungchang.com/pdf-epsilon (first pdfepsilon.com;
+changed later the same day), which the owner forwards to the GitHub Pages site. Ship signed,
 so 1.0.0 waits for certificates. A release candidate first.
 
 **Changes.**
@@ -48,6 +49,12 @@ so 1.0.0 waits for certificates. A release candidate first.
 - *Claims corrected on the website and in the README:* fonts are trimmed only when they are fully
   embedded TrueType (CID) fonts; images with few colours, "like most charts and screenshots", stay
   lossless, since it is decided from a colour sample. English and Korean.
+- *Website address:* the app's "Website" menu item (`SITE` in `ui/app.js`), the URL it is allowed to open
+  (`src-tauri/capabilities/default.json`, the exact address and anything under it), `homepage` in
+  `Cargo.toml` and `tauri.conf.json`, and the README now use https://yusungchang.com/pdf-epsilon instead of
+  the github.io address and the unregistered pdfepsilon.com. The update check still asks `api.github.com`.
+  Kept at 1.0.0 rather than 1.0.1, since 1.0.0 is not released and its tag must stay `v1.0.0`.
+  On the day the address returned 404 and yusungchang.com's certificate had expired (7 January 2026).
 - *Docs:* `SIGNING.md` (what to buy, which secrets, what changes in CI); `RELEASE-1.0.md` marked up
   with where each item stands; `HANDOVER.md` brought up to date.
 
