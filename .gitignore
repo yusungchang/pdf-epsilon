@@ -1,7 +1,5 @@
 /target
-/target.nosync
 /node_modules
-/node_modules.nosync
 /src-tauri/gen/schemas
 .DS_Store
 /scratch

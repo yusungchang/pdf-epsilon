@@ -1,3 +1,0 @@
-# The project lives in iCloud Drive, which does not sync folders ending in .nosync.
-[build]
-target-dir = "target.nosync"

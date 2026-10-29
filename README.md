@@ -113,7 +113,7 @@ Requirements are Rust (stable) and Node.js. On Linux, also install the
 ```sh
 npm install
 npm run dev      # run the app
-npm run build    # build installers into target.nosync/release/bundle/
+npm run build    # build installers into target/release/bundle/
 cargo test -p epsilon --release
 ```
 

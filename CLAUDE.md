@@ -37,9 +37,6 @@ current state, verified results, design decisions and next steps. Then read `REA
 - **Encrypted input is refused.** The check runs on the raw bytes as well as through
   lopdf's flags, because lopdf decrypts some files on load and silently fails on others.
   Saving them produced a near-empty PDF before the raw check existed.
-- **Build output stays out of iCloud.** The project lives in iCloud Drive. Build
-  output goes to `target.nosync` (see `.cargo/config.toml`), and `node_modules` is a
-  symlink to `node_modules.nosync`.
 
 ## Version
 

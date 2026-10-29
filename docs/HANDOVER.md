@@ -12,7 +12,7 @@ These came from the owner at the start:
 - **Website:** pdfepsilon.com, if available. Changed on 25 October 2026: https://yusungchang.com/pdf-epsilon,
   which the owner forwards to the GitHub Pages site.
 - **Platform:** a Tauri app installed locally on macOS, Linux and Windows.
-- **Location:** iCloud Drive/Projects, next to msw and the owner's other projects.
+- **Location:** `~/Projects/pdf-epsilon`, outside iCloud Drive (moved there on 29 October 2026). GitHub is the backup.
 
 ## Current state
 
@@ -45,8 +45,6 @@ The code is public at https://github.com/yusungchang/pdf-epsilon, branch `main`.
 - **GitHub:** the GitHub CLI `gh` is installed with Homebrew and logged in as `yusungchang`, with the `repo` and
   `workflow` scopes. Git uses it for HTTPS. Commits use the GitHub noreply address
   `19603908+yusungchang@users.noreply.github.com`, set in this repository's git config.
-- **iCloud:** build output goes to `target.nosync`, and `node_modules` is a symlink to `node_modules.nosync`.
-  iCloud does not sync folders ending in `.nosync`, and the Rust build folder reaches about 1.5 GB.
 - **Screenshots:** screen capture permission is not granted to the terminal, so the real app window cannot be screenshotted.
   Use `tools/ui-preview/preview.sh` to see the interface instead.
 

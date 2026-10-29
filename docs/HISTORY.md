@@ -56,6 +56,10 @@ so 1.0.0 waits for certificates. A release candidate first.
   Kept at 1.0.0 rather than 1.0.1, since 1.0.0 is not released and its tag must stay `v1.0.0`.
   At first the address returned 404 behind an expired certificate; later that day the owner set up the
   forward (301 to the github.io site) and a new certificate (SSL.com, valid to 11 May 2027).
+- *Moved out of iCloud (29 October 2026):* the project now lives in `~/Projects/pdf-epsilon`, with
+  GitHub as its backup. The `.nosync` workarounds are gone: build output goes to the default `target`
+  (`.cargo/config.toml` removed; CI, `render.rs`'s test helper, `tools/ui-preview/preview.sh` and the
+  README follow), and `node_modules` is a plain folder again. No change to the app, so still 1.0.0.
 - *Docs:* `SIGNING.md` (what to buy, which secrets, what changes in CI); `RELEASE-1.0.md` marked up
   with where each item stands; `HANDOVER.md` brought up to date.
 

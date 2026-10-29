@@ -312,7 +312,7 @@ mod tests {
     /// The built app, which `cargo test` builds for the integration tests. `None` when absent.
     fn app() -> Option<PathBuf> {
         let profile = if cfg!(debug_assertions) { "debug" } else { "release" };
-        let p = Path::new(env!("CARGO_MANIFEST_DIR")).join("../target.nosync").join(profile).join(format!("pdf-epsilon{}", std::env::consts::EXE_SUFFIX));
+        let p = Path::new(env!("CARGO_MANIFEST_DIR")).join("../target").join(profile).join(format!("pdf-epsilon{}", std::env::consts::EXE_SUFFIX));
         p.exists().then_some(p)
     }
 
