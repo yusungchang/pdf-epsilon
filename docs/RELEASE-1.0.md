@@ -193,4 +193,4 @@ All three fixed in 0.6.2; see `HISTORY.md` for how each was tested.
 - MSI and NSIS installers are both shipped.
 - The CI toolchain and `tauri-action` are not pinned, and releases publish no checksums.
 - Done: `HANDOVER.md` brought up to date for 1.0.0.
-- The minor-release routine still applies: security review, hostile corpus, fuzzing, then tag `v1.0.0`.
+- The minor-release routine ran for 1.0.0 (see HISTORY); the release was tagged `v1.0.1`.
