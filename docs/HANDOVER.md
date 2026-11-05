@@ -1,7 +1,7 @@
 # Handover
 
 Where PDF Epsilon stands, what has been verified, and what to do next.
-Last updated 25 October 2026, at version 1.0.0 (prepared, not yet tagged: it waits for signing).
+Last updated 5 November 2026, at version 1.0.0 (prepared, not yet tagged: it waits for Mac signing).
 
 ## The brief
 
@@ -122,8 +122,8 @@ truncated PDF both give a clear "not a readable PDF" message.
 - **Installers are not signed with a developer certificate.** The Mac app is ad-hoc signed, which is valid but
   anonymous: macOS asks for confirmation on first launch (System Settings, Privacy & Security, Open Anyway).
   An app that says "damaged" has a broken signature; check with `codesign --verify --deep --strict`.
-  Windows SmartScreen also warns. Removing the warnings needs an Apple Developer ID with notarization and a
-  Windows code-signing certificate.
+  Windows SmartScreen also warns. The Mac warning goes once the app is signed with a Developer ID and
+  notarized (in progress, `SIGNING.md`). Windows stays unsigned by the owner's decision (5 November 2026).
 
 ## Release routine
 
@@ -135,7 +135,9 @@ so `v0.4.0` is the first release to include it.
 
 0. **Release 1.0.0.** The code is ready and versioned 1.0.0 (MIT licence, release checks run; see HISTORY).
    It waits on two owner steps, then gets the minor-release tag `v1.0.0`:
-   - buy and set up signing, then wire it into CI as `SIGNING.md` describes;
+   - Mac signing: CI is ready (5 November 2026); the owner creates the Developer ID certificate and an
+     app-specific password and runs `tools/signing/setup-mac.sh`, then a signed build is tried and the
+     macOS first-launch steps come off the site and README (`SIGNING.md`). Windows is not signed, by decision;
    - try a release candidate from `main` (CI artifacts) on Windows and Linux.
    `RELEASE-1.0.md` keeps the full list, including the should and later items left for 1.x.
 1. **Owner decisions pending.** Email contact with users (optional, never required) was raised for 0.6.0 and

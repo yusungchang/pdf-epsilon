@@ -87,7 +87,41 @@ jobs:
         with:
           key: ${{ matrix.target }}
       - run: npm ci
+      # Mac signing and notarization (docs/SIGNING.md). The secrets are handed to Tauri only
+      # when they exist: Tauri reads an empty APPLE_SIGNING_IDENTITY as a real identity and
+      # fails, and without them the build falls back to the ad-hoc "-" in tauri.conf.json.
+      # Tags must be signed, so a tag without the secrets stops here instead of shipping unsigned.
+      - name: Mac signing secrets
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$APPLE_CERTIFICATE" ]; then
+            # Values stay masked in the log; each is a single line, as GITHUB_ENV needs.
+            for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY \
+                     APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+              printf '%s=%s\n' "$v" "${!v}" >> "$GITHUB_ENV"
+            done
+            echo "MAC_SIGNED=1" >> "$GITHUB_ENV"
+            # codesign needs Apple's Developer ID intermediate to build the chain; without it the
+            # identity counts as invalid. The system keychain stays searchable whatever keychain
+            # Tauri creates for the certificate.
+            curl -fsSL -o "$RUNNER_TEMP/DeveloperIDG2CA.cer" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+            sudo security add-certificates -k /Library/Keychains/System.keychain "$RUNNER_TEMP/DeveloperIDG2CA.cer" || true
+            echo "Signing with the Developer ID and notarizing."
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "::error::A release tag needs the APPLE_* secrets (run tools/signing/setup-mac.sh)."
+            exit 1
+          else
+            echo "No signing secrets: ad-hoc signed build."
+          fi
       # Without a tag name this only builds; with one it also uploads to the draft release.
+      # With the secrets above, Tauri signs the app, notarizes it with Apple and staples the ticket.
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -98,14 +132,27 @@ jobs:
           args: --target ${{ matrix.target }}
       # A Mac app with only the linker's signature is reported as damaged once downloaded.
       # Check the whole bundle, and the copy inside the dmg that people actually get.
+      # A signed build must also carry the Developer ID and a stapled notarization ticket,
+      # and Gatekeeper must accept it as notarized (when Gatekeeper is on, as on a real Mac).
       - name: Check the Mac signature
         if: runner.os == 'macOS'
         run: |
+          check() {
+            codesign --verify --deep --strict --verbose=2 "$1"
+            if [ "${MAC_SIGNED:-}" = 1 ]; then
+              codesign -dv --verbose=2 "$1" 2>&1 | grep "^Authority=Developer ID Application: "
+              xcrun stapler validate "$1"
+              if spctl --status | grep -q enabled; then
+                spctl --assess --type execute --verbose=2 "$1" 2>&1 | tee /dev/stderr \
+                  | grep "source=Notarized Developer ID"
+              fi
+            fi
+          }
           B=target/${{ matrix.target }}/release/bundle
-          codesign --verify --deep --strict --verbose=2 "$B"/macos/*.app
+          check "$(ls -d "$B"/macos/*.app)"
           M=$(mktemp -d)
           hdiutil attach -nobrowse -readonly -mountpoint "$M" "$B"/dmg/*.dmg
-          codesign --verify --deep --strict --verbose=2 "$M"/*.app
+          check "$(ls -d "$M"/*.app)"
           hdiutil detach "$M"
       # The same installers under names that never change, so the product page can link to
       # releases/latest/download/<name>. Only on tags; they go to the same draft release.

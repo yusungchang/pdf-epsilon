@@ -32,7 +32,15 @@ release candidate (CI artifacts from `main`) on Windows and Linux first. See `RE
 
 **Owner's decisions.** MIT licence. The homepage is https://yusungchang.com/pdf-epsilon (first pdfepsilon.com;
 changed later the same day), which the owner forwards to the GitHub Pages site. Ship signed,
-so 1.0.0 waits for certificates. A release candidate first.
+so 1.0.0 waits for certificates. A release candidate first. Later (5 November 2026): only the Mac app
+is signed and notarized; Windows stays unsigned, which is less hassle, and keeps its SmartScreen steps.
+
+**Mac signing in CI (5 November 2026).** `build.yml` signs with the Developer ID and notarizes every
+Mac build when the `APPLE_*` secrets exist, and checks the Developer ID, the stapled ticket and
+Gatekeeper's verdict on the app and inside the `.dmg`. Without the secrets, builds stay ad-hoc signed;
+a `v*` tag without them fails. `tools/signing/setup-mac.sh` checks the credentials with Apple and stores
+the secrets, so the owner's part is the certificate, the app-specific password and that script.
+See `SIGNING.md`.
 
 **Changes.**
 - *Licence:* `LICENSE` (MIT, Copyright 2026 Yusung Chang); `license = "MIT"` in `Cargo.toml` and
