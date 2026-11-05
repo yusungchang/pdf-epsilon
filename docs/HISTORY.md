@@ -40,7 +40,8 @@ Mac build when the `APPLE_*` secrets exist, and checks the Developer ID, the sta
 Gatekeeper's verdict on the app and inside the `.dmg`. Without the secrets, builds stay ad-hoc signed;
 a `v*` tag without them fails. `tools/signing/setup-mac.sh` checks the credentials with Apple and stores
 the secrets, so the owner's part is the certificate, the app-specific password and that script.
-See `SIGNING.md`.
+Verified the same day: Apple accepted both Mac apps of build 41967491848 (first review about 2 h 20 min),
+and the downloaded `.dmg` opened normally on the owner's Mac. See `SIGNING.md`.
 
 **Changes.**
 - *Licence:* `LICENSE` (MIT, Copyright 2026 Yusung Chang); `license = "MIT"` in `Cargo.toml` and

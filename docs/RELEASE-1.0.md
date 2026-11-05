@@ -6,9 +6,9 @@ engine blockers were reproduced twice. Test files and harnesses were kept outsid
 
 Severity: **blocker** loses content or breaks the app; **should** fix before 1.0; **later** after 1.0.
 
-**Where it stands (25 October 2026, code at 1.0.0, not yet tagged).** Every blocker and every must item is
-done except two that wait on the owner: a signed and notarized Mac app (`SIGNING.md`; Windows stays
-unsigned by decision, 5 November 2026) and trying the release candidate on Windows and Linux. The tag `v1.0.0` follows those.
+**Where it stands (5 November 2026, code at 1.0.0, not yet tagged).** Every blocker and every must item is
+done except one that waits on the owner: trying the release candidate on Windows and Linux. The Mac app
+is signed and notarized (`SIGNING.md`); Windows stays unsigned by decision. The tag `v1.0.0` follows.
 
 ## Blockers
 
@@ -135,8 +135,8 @@ All three fixed in 0.6.2; see `HISTORY.md` for how each was tested.
 - **A click-through of the real app on all three platforms.** The owner has used the real app on macOS
   through 0.11. Owner's decision: a release candidate from `main` is tried on Windows and Linux before the tag.
 - **Signing.** Owner's decision (25 October 2026): 1.0.0 waits for signed installers. What to buy and
-  what then changes is in `SIGNING.md`. macOS is ad-hoc signed and not notarised yet (Apple Developer
-  Program joined 5 November 2026). Owner's decision (5 November 2026): Windows is not signed, so
+  what then changes is in `SIGNING.md`. Done for macOS on 5 November 2026: signed with a Developer ID,
+  notarized, and checked on the owner's Mac. Owner's decision (5 November 2026): Windows is not signed, so
   SmartScreen keeps warning and the download page keeps its Windows first-launch steps.
 
 **Should:**

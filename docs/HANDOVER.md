@@ -1,7 +1,7 @@
 # Handover
 
 Where PDF Epsilon stands, what has been verified, and what to do next.
-Last updated 5 November 2026, at version 1.0.0 (prepared, not yet tagged: it waits for Mac signing).
+Last updated 5 November 2026, at version 1.0.0 (prepared, not yet tagged: Mac signing is done; it waits for the release candidate on Windows and Linux).
 
 ## The brief
 
@@ -119,11 +119,10 @@ truncated PDF both give a clear "not a readable PDF" message.
 - **Lossless images use no PNG predictors.** Adding them would make re-deflated graphics noticeably smaller.
 - **Encrypted PDFs cannot be processed.** A password prompt could open and re-encrypt them, but would need care with permissions.
 - **Files are processed one at a time.**
-- **Installers are not signed with a developer certificate.** The Mac app is ad-hoc signed, which is valid but
-  anonymous: macOS asks for confirmation on first launch (System Settings, Privacy & Security, Open Anyway).
-  An app that says "damaged" has a broken signature; check with `codesign --verify --deep --strict`.
-  Windows SmartScreen also warns. The Mac warning goes once the app is signed with a Developer ID and
-  notarized (in progress, `SIGNING.md`). Windows stays unsigned by the owner's decision (5 November 2026).
+- **Windows installers are not signed** (owner's decision, 5 November 2026), so SmartScreen warns on first
+  launch. Mac builds from `main` since 5 November 2026 are signed with a Developer ID and notarized; releases
+  up to v0.11.0 are ad-hoc signed and still need Open Anyway. An app that says "damaged" has a broken
+  signature; check with `codesign --verify --deep --strict`.
 
 ## Release routine
 
@@ -135,9 +134,9 @@ so `v0.4.0` is the first release to include it.
 
 0. **Release 1.0.0.** The code is ready and versioned 1.0.0 (MIT licence, release checks run; see HISTORY).
    It waits on two owner steps, then gets the minor-release tag `v1.0.0`:
-   - Mac signing: CI is ready (5 November 2026); the owner creates the Developer ID certificate and an
-     app-specific password and runs `tools/signing/setup-mac.sh`, then a signed build is tried and the
-     macOS first-launch steps come off the site and README (`SIGNING.md`). Windows is not signed, by decision;
+   - Mac signing: done and verified (5 November 2026, `SIGNING.md`). When v1.0.0 is published, merge the
+     `release-1.0-site` branch, which takes the macOS first-launch steps off the site and README.
+     Windows is not signed, by decision;
    - try a release candidate from `main` (CI artifacts) on Windows and Linux.
    `RELEASE-1.0.md` keeps the full list, including the should and later items left for 1.x.
 1. **Owner decisions pending.** Email contact with users (optional, never required) was raised for 0.6.0 and

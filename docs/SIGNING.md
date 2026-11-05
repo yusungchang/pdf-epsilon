@@ -59,10 +59,19 @@ CI does this on every push to `main` and every tag, so a release needs no manual
   Developer ID authority, `xcrun stapler validate`, and `spctl --assess` must report "Notarized
   Developer ID" when Gatekeeper is on.
 
-### Once the first signed build is confirmed
+### First signed build (5 November 2026)
 
-- The download page (`site/`), README and release notes lose the macOS first-launch steps. The
-  Windows steps stay.
+Build 41967491848 on `main` (commit 9e528b6): Apple accepted both Mac apps (submissions
+7f609021… Apple silicon, 5fa31526… Intel) after about 2 h 20 min, the one-off review of a new
+account; later submissions should take minutes. On the owner's Mac, the downloaded `.dmg` (with the
+quarantine flag) is assessed as "Notarized Developer ID", and the app opened normally.
+
+- The download page, README and release notes lose the macOS first-launch steps. That change is on
+  the `release-1.0-site` branch, to be merged when v1.0.0 is published: the site links to
+  `releases/latest`, which stays the unsigned v0.11.0 until then. The Windows steps stay.
+- If CI ever seems stuck on "Notarizing", Apple's side can be checked with
+  `xcrun notarytool history` using the same three credentials (a one-off workflow did this on
+  5 November 2026).
 - Not yet done: SHA-256 checksums published with every release.
 
 Then a release candidate is built from `main`, checked on all three platforms, and tagged `v1.0.0`.
