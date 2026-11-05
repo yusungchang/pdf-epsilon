@@ -148,9 +148,9 @@ cargo run -p epsilon --release --example fuzz -- out/ 20000 1 seeds/*.pdf   # mu
 Every push to `main` makes GitHub Actions run the tests and build installers for every
 platform. They can be downloaded from the run's artifacts for 14 days. Pushing a tag such as
 `v0.2.0` builds the same installers into a draft release: `.dmg` and `.app` for macOS, `.msi` and `.exe` for
-Windows, and `.deb`, `.rpm` and `.AppImage` for Linux. The builds are not signed with a
-developer certificate yet. On macOS, open the app once from System Settings, Privacy & Security,
-Open Anyway; Windows SmartScreen asks for More info, Run anyway.
+Windows, and `.deb`, `.rpm` and `.AppImage` for Linux. The macOS builds are signed with a Developer ID
+and notarized by Apple, so they open normally. The Windows builds are not signed, so SmartScreen asks
+for More info, Run anyway (see `docs/SIGNING.md`).
 
 Tagged builds also attach copies under names without a version (`PDF-Epsilon-macOS-AppleSilicon.dmg`,
 `PDF-Epsilon-macOS-Intel.dmg`, `PDF-Epsilon-Windows-Setup.exe`, `PDF-Epsilon-Windows.msi`,
