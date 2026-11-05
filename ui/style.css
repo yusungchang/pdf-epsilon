@@ -34,18 +34,16 @@
   color-scheme: light;
 }
 /* Dark colours: from the system unless Light is chosen, or chosen outright (data-theme).
-   The large flat greys (bg, panel, soft) keep blue two steps below red and green, never one.
-   One step puts the video "blue difference" (Cb) at exactly 127.5, so remote-desktop and
-   screen-sharing codecs round it differently per 64-px block and draw vertical stripes.
-   Two steps lands on a whole number (127.0), as does a neutral grey. */
+   Stripes or blocks in these greys seen through Remote Desktop come from its compression, not
+   from the colours: neutral greys stripe too, and reconnecting clears them (HISTORY 1.0.2). */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #161614;
-    --panel: #1f1f1d;
+    --bg: #161615;
+    --panel: #1f1f1e;
     --ink: #ededea;
     --muted: #9a9a94;
     --line: #2f2f2d;
-    --soft: #262624;
+    --soft: #262625;
     --accent: #6a9cf5;
     --accent-ink: #0d1424;
     --good: #4cc27f;
@@ -75,12 +73,12 @@
   }
 }
 :root[data-theme="dark"] {
-  --bg: #161614;
-  --panel: #1f1f1d;
+  --bg: #161615;
+  --panel: #1f1f1e;
   --ink: #ededea;
   --muted: #9a9a94;
   --line: #2f2f2d;
-  --soft: #262624;
+  --soft: #262625;
   --accent: #6a9cf5;
   --accent-ink: #0d1424;
   --good: #4cc27f;
