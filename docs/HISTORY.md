@@ -19,11 +19,30 @@
 | 0.10.0 | 2026-10-24 | Faster: images on every core, a SIMD resizer, shared work in analyses, a lookup table in the operation count; memory sized to the computer. Analysis 1.8×, saving 2.0× against 0.9.0. |
 | 0.11.0 | 2026-10-25 | Released as a minor version at the owner's request (built locally as 0.10.1). Comparison pictures no longer lost when they arrive after the reply (the cause of "could not be rendered", worst at 2× and 4×). "Details" starts closed; no focus ring on the comparison's close button when it opens. |
 | 0.11.1 | 2026-10-25 | One "Compare pages" button above the page list instead of one per page; page arrows in the comparison moved into the toolbar as "‹ Page 3 of 12 ›", with the arrow keys; zoom icons; "Only pages with issues" in the comparison. |
-| 1.0.0 | 2026-10-25 | Prepared, not yet tagged (waits for signing): MIT licence, corrected PDF/A advice, Korean system dialogs on macOS, site and README claims corrected; full release checks. |
+| 1.0.0 | 2026-10-25 | Prepared, never tagged (released as 1.0.1): MIT licence, corrected PDF/A advice, Korean system dialogs on macOS, site and README claims corrected; full release checks. |
+| 1.0.1 | 2026-11-05 | The release: Mac app signed and notarized; website address in the macOS About window; site without the macOS first-launch steps. Windows stays unsigned. |
 | 0.5.0 | 2026-10-21 | 0.4.1 released as a minor version at the owner's request; first-launch steps shown on every download; security review. |
 | 0.4.1 | 2026-10-21 | Long file names truncate on every WebKit, a round handle on the comparison divider, glass-finish icon, a product page on GitHub Pages, findings and pages folded under Advanced. |
 
-## 1.0.0, 25 October 2026 (prepared; tag waits for signing)
+## 1.0.1, 5 November 2026 (released)
+
+**Owner's decisions.** 1.0.1 is the release: tagged `v1.0.1` and published, although the scheme leaves
+z versions untagged (1.0.0 itself was never tagged). The separate Windows and Linux release-candidate
+trial was not held; the CI builds of every platform passed.
+
+**Changes.**
+- *About window (macOS):* shows https://yusungchang.com/pdf-epsilon as a link. AppKit reads
+  `Credits.rtf` from the app's Resources when no credits are passed, and Tauri's default menu passes
+  none, so the file (`src-tauri/macos/Credits.rtf`, bundled through `bundle.macOS.files`) is all it
+  takes. Windows and Linux have no app menu, so no About window.
+- *Signing:* the Mac app is signed with the Developer ID and notarized (see the 1.0.0 section and
+  `SIGNING.md`).
+- *Site and README:* the macOS first-launch steps are gone (branch `release-1.0-site`, merged once the
+  release was published, because the download buttons follow `releases/latest`).
+
+No engine or parsing change, so no new hostile-file cases.
+
+## 1.0.0, 25 October 2026 (prepared; released as 1.0.1)
 
 The owner asked for 1.0.0 with "nothing funny". The code is versioned 1.0.0 and checked, but not
 tagged: the owner chose to wait for signed installers, to set up the website address, and to try a

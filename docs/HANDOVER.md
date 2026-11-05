@@ -1,7 +1,7 @@
 # Handover
 
 Where PDF Epsilon stands, what has been verified, and what to do next.
-Last updated 5 November 2026, at version 1.0.0 (prepared, not yet tagged: Mac signing is done; it waits for the release candidate on Windows and Linux).
+Last updated 5 November 2026, at version 1.0.1 (released, tag `v1.0.1`).
 
 ## The brief
 
@@ -132,17 +132,12 @@ so `v0.4.0` is the first release to include it.
 
 ## Next steps
 
-0. **Release 1.0.0.** The code is ready and versioned 1.0.0 (MIT licence, release checks run; see HISTORY).
-   It waits on two owner steps, then gets the minor-release tag `v1.0.0`:
-   - Mac signing: done and verified (5 November 2026, `SIGNING.md`). When v1.0.0 is published, merge the
-     `release-1.0-site` branch, which takes the macOS first-launch steps off the site and README.
-     Windows is not signed, by decision;
-   - try a release candidate from `main` (CI artifacts) on Windows and Linux.
-   `RELEASE-1.0.md` keeps the full list, including the should and later items left for 1.x.
+0. **1.0.1 is released** (5 November 2026, tag `v1.0.1`): Mac app signed and notarized, Windows unsigned
+   by decision. `RELEASE-1.0.md` keeps the should and later items left for 1.x.
 1. **Owner decisions pending.** Email contact with users (optional, never required) was raised for 0.6.0 and
    left for later. Donations (GitHub Sponsors, Ko-fi, toss.me) were discussed and not built yet.
    Report the lopdf free-entry bug upstream (see HISTORY 0.6.0, item 3) once the owner agrees.
-2. **Owner decisions.** Licence chosen (MIT, 1.0.0). The domain and signing are part of step 0.
+2. **Owner decisions.** Licence chosen (MIT, 1.0.0). Domain and signing done (1.0.1).
 3. **Engine improvements,** in the order recommended by `reports/PDF size optimization techniques.md` (19 October 2026):
    CCITT G4 then lossless JBIG2 for bilevel images; lossless pixel-format reduction with PNG predictors; lossless JPEG
    Huffman optimisation (also a safe path for CMYK JPEGs); `libdeflater` plus structural tidying; simple-font and CFF

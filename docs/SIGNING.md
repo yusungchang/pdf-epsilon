@@ -67,14 +67,14 @@ account; later submissions should take minutes. On the owner's Mac, the download
 quarantine flag) is assessed as "Notarized Developer ID", and the app opened normally.
 
 - The download page, README and release notes lose the macOS first-launch steps. That change is on
-  the `release-1.0-site` branch, to be merged when v1.0.0 is published: the site links to
-  `releases/latest`, which stays the unsigned v0.11.0 until then. The Windows steps stay.
+  the `release-1.0-site` branch, merged when v1.0.1 was published: the site links to
+  `releases/latest`, which was the unsigned v0.11.0 until then. The Windows steps stay.
 - If CI ever seems stuck on "Notarizing", Apple's side can be checked with
   `xcrun notarytool history` using the same three credentials (a one-off workflow did this on
   5 November 2026).
 - Not yet done: SHA-256 checksums published with every release.
 
-Then a release candidate is built from `main`, checked on all three platforms, and tagged `v1.0.0`.
+Released as `v1.0.1` on 5 November 2026.
 
 ## Windows: not signed
 

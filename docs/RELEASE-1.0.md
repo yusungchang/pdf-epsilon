@@ -6,9 +6,10 @@ engine blockers were reproduced twice. Test files and harnesses were kept outsid
 
 Severity: **blocker** loses content or breaks the app; **should** fix before 1.0; **later** after 1.0.
 
-**Where it stands (5 November 2026, code at 1.0.0, not yet tagged).** Every blocker and every must item is
-done except one that waits on the owner: trying the release candidate on Windows and Linux. The Mac app
-is signed and notarized (`SIGNING.md`); Windows stays unsigned by decision. The tag `v1.0.0` follows.
+**Where it stands (5 November 2026).** Released as 1.0.1 (tag `v1.0.1`); 1.0.0 was never tagged. Every
+blocker and every must item is done. The Mac app is signed and notarized (`SIGNING.md`); Windows stays
+unsigned by decision. The owner released without the separate Windows and Linux trial; CI builds of
+every platform passed.
 
 ## Blockers
 
