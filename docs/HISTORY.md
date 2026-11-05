@@ -21,8 +21,27 @@
 | 0.11.1 | 2026-10-25 | One "Compare pages" button above the page list instead of one per page; page arrows in the comparison moved into the toolbar as "‹ Page 3 of 12 ›", with the arrow keys; zoom icons; "Only pages with issues" in the comparison. |
 | 1.0.0 | 2026-10-25 | Prepared, never tagged (released as 1.0.1): MIT licence, corrected PDF/A advice, Korean system dialogs on macOS, site and README claims corrected; full release checks. |
 | 1.0.1 | 2026-11-05 | The release: Mac app signed and notarized; website address in the macOS About window; site without the macOS first-launch steps. Windows stays unsigned. |
+| 1.0.2 | 2026-11-05 | Dark-theme greys moved off a video rounding boundary, so they no longer stripe over Windows App (Remote Desktop) or screen sharing. |
 | 0.5.0 | 2026-10-21 | 0.4.1 released as a minor version at the owner's request; first-launch steps shown on every download; security review. |
 | 0.4.1 | 2026-10-21 | Long file names truncate on every WebKit, a round handle on the comparison divider, glass-finish icon, a product page on GitHub Pages, findings and pages folded under Advanced. |
+
+## 1.0.2, 5 November 2026
+
+**Dark-theme stripes over remote desktop.** The owner saw faint vertical stripes in the dark background
+when looking at the Windows build through Windows App on macOS. In the screenshot they repeat every 64 px,
+one brightness step apart, in the background and in the drop zone; most other apps show none.
+
+*Cause.* Video codecs store brightness plus two colour differences, rounded to whole numbers. For any grey
+with red = green and blue one step lower, the blue difference (Cb) is exactly 127.5 in both BT.601 and
+BT.709, because the red and green weights in Cb add up to -0.5. The encoder rounds it either way in each
+64-px block, and neighbouring blocks decode to slightly different greys. `--bg #161615`, `--panel #1f1f1e`
+and `--soft #262625` were all such greys. Neutral greys (Explorer, VS Code) give exactly 128, which is why
+other apps are clean.
+
+*Change.* Those three dark-theme greys now keep blue two steps lower (`#161614`, `#1f1f1d`, `#262624`),
+which gives Cb = 127.0: the same warm tint, no rounding boundary. Text and thin lines on boundary values
+(`--ink`, light `--line` and `--muted`) were left alone; they are too small to stripe. The light theme's
+large areas were already off the boundary. To be confirmed by the owner over Windows App.
 
 ## 1.0.1, 5 November 2026 (released)
 
