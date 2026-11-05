@@ -21,30 +21,8 @@
 | 0.11.1 | 2026-10-25 | One "Compare pages" button above the page list instead of one per page; page arrows in the comparison moved into the toolbar as "‹ Page 3 of 12 ›", with the arrow keys; zoom icons; "Only pages with issues" in the comparison. |
 | 1.0.0 | 2026-10-25 | Prepared, never tagged (released as 1.0.1): MIT licence, corrected PDF/A advice, Korean system dialogs on macOS, site and README claims corrected; full release checks. |
 | 1.0.1 | 2026-11-05 | The release: Mac app signed and notarized; website address in the macOS About window; site without the macOS first-launch steps. Windows stays unsigned. |
-| 1.0.2 | 2026-11-05 | Stripes in the dark theme over Windows App (Remote Desktop) traced to its compression; a colour change was tried and reverted, so no visible change. |
 | 0.5.0 | 2026-10-21 | 0.4.1 released as a minor version at the owner's request; first-launch steps shown on every download; security review. |
 | 0.4.1 | 2026-10-21 | Long file names truncate on every WebKit, a round handle on the comparison divider, glass-finish icon, a product page on GitHub Pages, findings and pages folded under Advanced. |
-
-## 1.0.2, 5 November 2026
-
-**Dark-theme stripes over remote desktop: not the app.** The owner saw faint vertical stripes in the
-dark background when looking at the Windows build through Windows App on macOS (32-bit colour, optimised
-for Retina). On the Windows screen itself there were none. In a screenshot they repeat every 64 px, one
-brightness step apart, identical in every row: the 64 × 64 tiles of Remote Desktop's codec.
-
-*First theory, wrong.* The greys `#161615`, `#1f1f1e` and `#262625` have blue one step below red and
-green, which puts the 8-bit BT.601/709 Cb value at exactly 127.5, a rounding boundary. The greys were
-changed to two steps (`#161614`, `#1f1f1d`, `#262624`); the CI build still striped.
-
-*Test that settled it.* A page of large swatches in Edge over the same connection: old, 1.0.2, neutral
-(`22,22,22`, `31,31,31`, `32,32,32`, `30,30,30`) and cool greys. Neutral `22,22,22` showed block artifacts
-as clearly as the tinted greys, so the colour is not the cause. Disconnecting and reconnecting Windows App
-with 1.0.1 already open cleared the stripes: Remote Desktop sends a lossy first pass and does not always
-refine a static area, and a reconnect resends the screen.
-
-*Result.* The colours are back to their 1.0.1 values, with a comment in `style.css` pointing here so the
-theory is not tried again. No visible change in 1.0.2. If it matters for a user, the server-side Group
-Policy "Configure image quality for RemoteFX Adaptive Graphics" (Lossless) is the lever, not the app.
 
 ## 1.0.1, 5 November 2026 (released)
 

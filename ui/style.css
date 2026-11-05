@@ -33,9 +33,7 @@
   --control-edge: var(--line);
   color-scheme: light;
 }
-/* Dark colours: from the system unless Light is chosen, or chosen outright (data-theme).
-   Stripes or blocks in these greys seen through Remote Desktop come from its compression, not
-   from the colours: neutral greys stripe too, and reconnecting clears them (HISTORY 1.0.2). */
+/* Dark colours: from the system unless Light is chosen, or chosen outright (data-theme). */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #161615;

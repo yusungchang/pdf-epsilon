@@ -1,7 +1,7 @@
 # Handover
 
 Where PDF Epsilon stands, what has been verified, and what to do next.
-Last updated 5 November 2026, at version 1.0.2 (untagged; 1.0.1 is the latest release, tag `v1.0.1`).
+Last updated 5 November 2026, at version 1.0.1 (released, tag `v1.0.1`).
 
 ## The brief
 
@@ -134,8 +134,6 @@ so `v0.4.0` is the first release to include it.
 
 0. **1.0.1 is released** (5 November 2026, tag `v1.0.1`): Mac app signed and notarized, Windows unsigned
    by decision. `RELEASE-1.0.md` keeps the should and later items left for 1.x.
-   1.0.2 (untagged) has no visible change: stripes seen over Windows App were traced to Remote Desktop's
-   compression, and a colour change tried for them was reverted (see HISTORY 1.0.2).
 1. **Owner decisions pending.** Email contact with users (optional, never required) was raised for 0.6.0 and
    left for later. Donations (GitHub Sponsors, Ko-fi, toss.me) were discussed and not built yet.
    Report the lopdf free-entry bug upstream (see HISTORY 0.6.0, item 3) once the owner agrees.
